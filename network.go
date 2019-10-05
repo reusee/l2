@@ -6,7 +6,6 @@ import (
 	"net"
 	"os"
 	"sync"
-	"time"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
@@ -20,7 +19,9 @@ type Network struct {
 	MTU       int
 	CryptoKey []byte
 
-	SelectNode dyn
+	SelectNode  dyn
+	OnFrame     func([]byte)
+	InjectFrame chan ([]byte)
 
 	localNode *Node
 	ifaces    []*water.Interface
@@ -114,22 +115,6 @@ func (n *Network) Start() (err error) {
 	}
 	n.SetupInterfaces()
 
-	// outbounds
-	outboundPayloads := make(chan Bytes)
-	for _, iface := range n.ifaces {
-		iface := iface
-		go func() {
-			buf := make([]byte, n.MTU+14)
-			for {
-				n, err := iface.Read(buf)
-				ce(err, "read from interface")
-				payload := getBytes(n)
-				copy(payload.Bytes, buf[:n])
-				outboundPayloads <- payload
-			}
-		}()
-	}
-
 	// scope
 	closing := make(chan struct{})
 	n.closing = closing
@@ -149,6 +134,33 @@ func (n *Network) Start() (err error) {
 				closing
 		},
 	)
+
+	// outbounds
+	outboundPayloads := make(chan Bytes)
+	for _, iface := range n.ifaces {
+		iface := iface
+		spawn(scope, func() {
+			buf := make([]byte, n.MTU+14)
+			for {
+				n, err := iface.Read(buf)
+				if err != nil {
+					select {
+					case <-closing:
+						return
+					default:
+						ce(err, "read from interface")
+					}
+				}
+				payload := getBytes(n)
+				copy(payload.Bytes, buf[:n])
+				select {
+				case outboundPayloads <- payload:
+				case <-closing:
+					return
+				}
+			}
+		})
+	}
 
 	// start bridges
 	for _, name := range localNode.BridgeNames {
@@ -181,9 +193,7 @@ func (n *Network) Start() (err error) {
 			case bs := <-outboundPayloads:
 				payload := bs.Bytes
 
-				t0 := time.Now()
 				parser.DecodeLayers(payload, &decoded)
-				pt("%v\n", time.Since(t0))
 				for _, t := range decoded {
 					switch t {
 
@@ -194,7 +204,6 @@ func (n *Network) Start() (err error) {
 						}
 
 					case layers.LayerTypeARP:
-						pt("%+v\n", arp)
 
 					case layers.LayerTypeIPv4:
 						if !n.Network.Contains(ipv4.DstIP) {
@@ -204,7 +213,29 @@ func (n *Network) Start() (err error) {
 					}
 				}
 
+				if n.OnFrame != nil {
+					n.OnFrame(bs.Bytes)
+				}
+
 				bs.Put()
+
+			case <-closing:
+				return
+
+			}
+		}
+	})
+
+	// handle inbounds
+	n.InjectFrame = make(chan []byte)
+	spawn(scope, func(
+		closing Closing,
+	) {
+		for {
+			select {
+
+			case bs := <-n.InjectFrame:
+				n.ifaces[0].Write(bs)
 
 			case <-closing:
 				return
@@ -218,5 +249,8 @@ func (n *Network) Start() (err error) {
 
 func (n *Network) Close() {
 	close(n.closing)
+	for _, iface := range n.ifaces {
+		iface.Close()
+	}
 	n.closed.Wait()
 }

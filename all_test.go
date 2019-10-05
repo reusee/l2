@@ -1,7 +1,7 @@
 package l2
 
 import (
-	"bytes"
+	"encoding/json"
 	"net"
 	"runtime"
 	"testing"
@@ -24,24 +24,16 @@ func TestAll(t *testing.T) {
 	node2 := &Node{
 		LanIP: net.IPv4(192, 168, 42, 2),
 	}
-	addr1 := &net.UDPAddr{
-		IP:   node1.LanIP,
-		Port: 4242,
-	}
-	addr2 := &net.UDPAddr{
-		IP:   node2.LanIP,
-		Port: 4242,
-	}
 
 	nodes := []*Node{
 		node1, node2,
 	}
-	numG := runtime.NumGoroutine()
+	var network1, network2 *Network
 
 	// node1
-	var conn1 *net.UDPConn
+	var ln net.Listener
 	closed1 := make(chan struct{})
-	var network1 *Network
+	ok1 := make(chan struct{})
 	go func() {
 		runtime.LockOSThread()
 		ns0, err := netns.Get()
@@ -62,6 +54,14 @@ func TestAll(t *testing.T) {
 			SelectNode: func() *Node {
 				return node1
 			},
+			OnFrame: func(bs []byte) {
+				c := make([]byte, len(bs))
+				copy(c, bs)
+				select {
+				case network2.InjectFrame <- c:
+				case <-network2.closing:
+				}
+			},
 		}
 		err = network1.Start()
 		ce(err)
@@ -69,24 +69,23 @@ func TestAll(t *testing.T) {
 			t.Fatal()
 		}
 
-		conn1, err = net.ListenUDP("udp", addr1)
+		ln, err = net.Listen("tcp", node1.LanIP.String()+":34567")
 		ce(err)
 		go func() {
-			buf := make([]byte, 4096)
-			for {
-				n, addr, err := conn1.ReadFromUDP(buf)
-				if err != nil {
-					break
-				}
-				_, err = conn1.WriteToUDP(buf[:n], addr)
-				ce(err)
-			}
+			conn, err := ln.Accept()
+			ce(err)
+			var obj interface{}
+			ce(json.NewDecoder(conn).Decode(&obj))
+			ce(json.NewEncoder(conn).Encode(obj))
+			conn.Close()
 			close(closed1)
 		}()
 
+		close(ok1)
 	}()
 
-	network2 := &Network{
+	<-ok1
+	network2 = &Network{
 		Network: net.IPNet{
 			IP:   net.IPv4(192, 168, 42, 0),
 			Mask: net.CIDRMask(24, 32),
@@ -97,6 +96,14 @@ func TestAll(t *testing.T) {
 		SelectNode: func() *Node {
 			return node2
 		},
+		OnFrame: func(bs []byte) {
+			c := make([]byte, len(bs))
+			copy(c, bs)
+			select {
+			case network1.InjectFrame <- c:
+			case <-network1.closing:
+			}
+		},
 	}
 	err := network2.Start()
 	ce(err)
@@ -104,30 +111,20 @@ func TestAll(t *testing.T) {
 		t.Fatal()
 	}
 
-	conn2, err := net.ListenUDP("udp", addr2)
+	conn, err := net.Dial("tcp", node1.LanIP.String()+":34567")
 	ce(err)
-	msg := []byte("foo")
-	conn2.WriteToUDP([]byte("foo"), addr1)
-	buf := make([]byte, 4096)
-	n, addr, err := conn2.ReadFromUDP(buf)
-	ce(err)
-	if !addr.IP.Equal(addr1.IP) {
+	ce(json.NewEncoder(conn).Encode("foo"))
+	var s string
+	ce(json.NewDecoder(conn).Decode(&s))
+	if s != "foo" {
 		t.Fatal()
 	}
-	if !bytes.Equal(buf[:n], msg) {
-		t.Fatal()
-	}
-	conn2.Close()
+	conn.Close()
 
-	conn1.Close()
+	ln.Close()
 	<-closed1
 
 	network1.Close()
 	network2.Close()
-
-	if numG != runtime.NumGoroutine() {
-		pt("%d %d\n", numG, runtime.NumGoroutine())
-		t.Fatalf("goroutine leaked")
-	}
 
 }
