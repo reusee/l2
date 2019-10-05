@@ -25,7 +25,12 @@ func TestAll(t *testing.T) {
 			IP:   net.IPv4(192, 168, 42, 0),
 			Mask: net.CIDRMask(24, 32),
 		},
-		Nodes: nodes,
+		Nodes:     nodes,
+		MTU:       1345,
+		CryptoKey: []byte("1234567890123456"),
+		SelectNode: func() *Node {
+			return nil
+		},
 	}
 
 	numG := runtime.NumGoroutine()

@@ -12,10 +12,10 @@ import (
 )
 
 type Network struct {
-	Network net.IPNet
-	Nodes   []*Node
-	Bridges []Bridge
-	MTU     int
+	Network   net.IPNet
+	Nodes     []*Node
+	MTU       int
+	CryptoKey []byte
 
 	SelectNode dyn
 
@@ -126,12 +126,19 @@ func (n *Network) Start() (err error) {
 			Spawn,
 			Closing,
 		) {
-			return spawn, closing
+			return spawn,
+				closing
 		},
 	)
 
-	spawn(scope, func() {
-	})
+	// start bridges
+	for _, name := range localNode.BridgeNames {
+		bridge, ok := availableBridges[name]
+		if !ok {
+			ce(me(nil, "no such bridge: %s", name))
+		}
+		spawn(scope, bridge.Start)
+	}
 
 	return nil
 }
