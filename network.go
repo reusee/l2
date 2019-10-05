@@ -26,7 +26,8 @@ type Network struct {
 	localNode *Node
 	ifaces    []*water.Interface
 	closing   chan struct{}
-	closed    sync.WaitGroup
+	waitClose sync.WaitGroup
+	closeOnce sync.Once
 }
 
 type (
@@ -119,9 +120,9 @@ func (n *Network) Start() (err error) {
 	closing := make(chan struct{})
 	n.closing = closing
 	spawn := func(scope Scope, fn any) {
-		n.closed.Add(1)
+		n.waitClose.Add(1)
 		go func() {
-			defer n.closed.Done()
+			defer n.waitClose.Done()
 			scope.Call(fn)
 		}()
 	}
@@ -248,9 +249,11 @@ func (n *Network) Start() (err error) {
 }
 
 func (n *Network) Close() {
-	close(n.closing)
-	for _, iface := range n.ifaces {
-		iface.Close()
-	}
-	n.closed.Wait()
+	n.closeOnce.Do(func() {
+		close(n.closing)
+		for _, iface := range n.ifaces {
+			iface.Close()
+		}
+		n.waitClose.Wait()
+	})
 }
