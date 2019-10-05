@@ -1,0 +1,12 @@
+github.com/beevik/ntp v0.2.0 h1:sGsd+kAXzT0bfVfzJfce04g+dSRfrs+tbQW8lweuYgw=
+github.com/beevik/ntp v0.2.0/go.mod h1:hIHWr+l3+/clUnF44zdK+CWW7fO8dR5cIylAQ76NRpg=
+github.com/reusee/dscope v0.0.0-20190907053525-42cbb6fc78f8 h1:172tG8oMkvAMBxB4DUDna9aW0AbMKIV6HpnT4U0bowM=
+github.com/reusee/dscope v0.0.0-20190907053525-42cbb6fc78f8/go.mod h1:3YStua5Cdi2FJixYwigqIUYhARAZ8fQSTSNZ2ZotVA8=
+github.com/reusee/e/v2 v2.3.3 h1:/voLHd60okWZ1KEaY4Pln877sbxYQJR2qj48bpWyI0I=
+github.com/reusee/e/v2 v2.3.3/go.mod h1:kykJjxDURd5MAGzB+xkwN7WxfuZaotLjTssHtjpi5LQ=
+golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2/go.mod h1:djNgcEr1/C05ACkg1iLfiJU5Ep61QUkGW8qpdssI0+w=
+golang.org/x/net v0.0.0-20191003171128-d98b1b443823 h1:Ypyv6BNJh07T1pUSrehkLemqPKXhus2MkfktJ91kRh4=
+golang.org/x/net v0.0.0-20191003171128-d98b1b443823/go.mod h1:z5CRVTTTmAJ677TzLLGU+0bjPO0LkuOLi4/5GtJWs/s=
+golang.org/x/sys v0.0.0-20190215142949-d0b11bdaac8a h1:1BGLXjeY4akVXGgbC9HugT3Jv3hCI0z56oJR5vAMgBU=
+golang.org/x/sys v0.0.0-20190215142949-d0b11bdaac8a/go.mod h1:STP8DvDyc/dI5b8T5hshtkjS+E42TnysNCUPdjciGhY=
+golang.org/x/text v0.3.0/go.mod h1:NqM8EUOU14njkJ3fqMW+pc6Ldnwhi/IjpwHt7yyuwOQ=
