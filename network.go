@@ -6,6 +6,7 @@ import (
 	"net"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
@@ -162,33 +163,46 @@ func (n *Network) Start() (err error) {
 	spawn(scope, func(
 		closing Closing,
 	) {
+
+		parser := gopacket.NewDecodingLayerParser(layers.LayerTypeEthernet)
+		parser.SetDecodingLayerContainer(gopacket.DecodingLayerSparse(nil))
+		var eth layers.Ethernet
+		var arp layers.ARP
+		var ipv4 layers.IPv4
+		parser.AddDecodingLayer(&eth)
+		parser.AddDecodingLayer(&ipv4)
+		parser.AddDecodingLayer(&arp)
+		decoded := make([]gopacket.LayerType, 0, 10)
+
+	loop:
 		for {
 			select {
 
 			case bs := <-outboundPayloads:
 				payload := bs.Bytes
 
-				packet := gopacket.NewPacket(
-					payload,
-					layers.LayerTypeEthernet,
-					gopacket.DecodeOptions{
-						Lazy:   true,
-						NoCopy: true,
-					},
-				)
-				ethernet := packet.Layer(layers.LayerTypeEthernet).(*layers.Ethernet)
-				if ethernet.EthernetType != layers.EthernetTypeIPv4 &&
-					ethernet.EthernetType != layers.EthernetTypeARP {
-					break
-				}
+				t0 := time.Now()
+				parser.DecodeLayers(payload, &decoded)
+				pt("%v\n", time.Since(t0))
+				for _, t := range decoded {
+					switch t {
 
-				pt("----------\n")
-				for _, layer := range packet.Layers() {
-					pt("%v\n", layer.LayerType())
-					pt("%T\n", layer)
-					pt("%+v\n", layer)
+					case layers.LayerTypeEthernet:
+						if eth.EthernetType != layers.EthernetTypeIPv4 &&
+							eth.EthernetType != layers.EthernetTypeARP {
+							continue loop
+						}
+
+					case layers.LayerTypeARP:
+						pt("%+v\n", arp)
+
+					case layers.LayerTypeIPv4:
+						if !n.Network.Contains(ipv4.DstIP) {
+							continue loop
+						}
+
+					}
 				}
-				pt("\n\n\n\n")
 
 				bs.Put()
 

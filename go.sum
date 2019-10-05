@@ -4,6 +4,8 @@ github.com/google/go-cmp v0.2.0/go.mod h1:oXzfMopK8JAjlY9xF4vHSVASa0yLyX7SntLO5a
 github.com/google/go-cmp v0.3.0/go.mod h1:8QqcDgzrUqlUb/G2PQTWiueGozuR1884gddMywk6iLU=
 github.com/google/gopacket v1.1.17 h1:rMrlX2ZY2UbvT+sdz3+6J+pp2z+msCq9MxTU6ymxbBY=
 github.com/google/gopacket v1.1.17/go.mod h1:UdDNZ1OO62aGYVnPhxT1U6aI7ukYtA/kB8vaU0diBUM=
+github.com/google/gopacket v1.1.18-0.20190926102631-33810c487ced h1:BIKw9t86FwdvLUQhdlibsXxcFyABQ1EHCANv1AZn+1A=
+github.com/google/gopacket v1.1.18-0.20190926102631-33810c487ced/go.mod h1:UdDNZ1OO62aGYVnPhxT1U6aI7ukYtA/kB8vaU0diBUM=
 github.com/mdlayher/raw v0.0.0-20190606142536-fef19f00fc18/go.mod h1:7EpbotpCmVZcu+KCX4g9WaRNuu11uyhiW7+Le1dKawg=
 github.com/reusee/dscope v0.0.0-20190907053525-42cbb6fc78f8 h1:172tG8oMkvAMBxB4DUDna9aW0AbMKIV6HpnT4U0bowM=
 github.com/reusee/dscope v0.0.0-20190907053525-42cbb6fc78f8/go.mod h1:3YStua5Cdi2FJixYwigqIUYhARAZ8fQSTSNZ2ZotVA8=
