@@ -20,7 +20,7 @@ type Network struct {
 	SelectNode dyn
 
 	localNode *Node
-	iface     *water.Interface
+	ifaces    []*water.Interface
 	closing   chan struct{}
 	closed    sync.WaitGroup
 }
@@ -109,7 +109,7 @@ func (n *Network) Start() (err error) {
 	if n.MTU == 0 {
 		n.MTU = 1300
 	}
-	n.SetupInterface()
+	n.SetupInterfaces()
 
 	// scope
 	closing := make(chan struct{})
