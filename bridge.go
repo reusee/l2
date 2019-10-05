@@ -15,3 +15,11 @@ var availableBridges = map[string]Bridge{
 		Start: startICMP,
 	},
 }
+
+var allBridgeNames = func() []string {
+	var names []string
+	for name := range availableBridges {
+		names = append(names, name)
+	}
+	return names
+}()

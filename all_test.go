@@ -10,13 +10,13 @@ func TestAll(t *testing.T) {
 
 	nodes := []*Node{
 		{
-			IP: net.IPv4(192, 168, 42, 1),
+			LanIP: net.IPv4(192, 168, 42, 1),
 		},
 		{
-			IP: net.IPv4(192, 168, 42, 2),
+			LanIP: net.IPv4(192, 168, 42, 2),
 		},
 		{
-			IP: net.IPv4(192, 168, 42, 3),
+			LanIP: net.IPv4(192, 168, 42, 3),
 		},
 	}
 
@@ -45,7 +45,7 @@ func TestAll(t *testing.T) {
 		}
 	}()
 
-	if !network.Network.Contains(network.localNode.IP) {
+	if !network.Network.Contains(network.localNode.LanIP) {
 		t.Fatal()
 	}
 

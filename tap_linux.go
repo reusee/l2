@@ -25,7 +25,7 @@ func (n *Network) SetupInterface() {
 	ce(err)
 	err = netlink.AddrAdd(link, &netlink.Addr{
 		IPNet: &net.IPNet{
-			IP:   n.localNode.IP,
+			IP:   n.localNode.LanIP,
 			Mask: n.Network.Mask,
 		},
 	})

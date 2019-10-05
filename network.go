@@ -76,12 +76,12 @@ func (n *Network) Start() (err error) {
 			ip[i] = b | bs[i]
 		}
 		for _, node := range n.Nodes {
-			if node.IP.Equal(ip) {
+			if node.LanIP.Equal(ip) {
 				goto random_ip
 			}
 		}
 		localNode = &Node{
-			IP: ip,
+			LanIP: ip,
 		}
 	}
 
@@ -89,7 +89,7 @@ func (n *Network) Start() (err error) {
 	n.localNode = localNode
 	var existed bool
 	for _, node := range n.Nodes {
-		if node.IP.Equal(localNode.IP) {
+		if node.LanIP.Equal(localNode.LanIP) {
 			existed = true
 			break
 		}
@@ -101,7 +101,7 @@ func (n *Network) Start() (err error) {
 	// default bridges
 	for _, node := range n.Nodes {
 		if len(node.BridgeNames) == 0 {
-			node.BridgeNames = []string{"TCP", "UDP"}
+			node.BridgeNames = allBridgeNames
 		}
 	}
 
