@@ -24,7 +24,7 @@ type (
 	Hostname       string
 )
 
-func (n *Network) Setup() error {
+func (n *Network) Start() error {
 
 	// get local node
 	var localNode *Node

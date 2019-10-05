@@ -27,11 +27,13 @@ func TestAll(t *testing.T) {
 		Nodes: nodes,
 	}
 
-	if err := network.Setup(); err != nil {
+	if err := network.Start(); err != nil {
 		t.Fatal(err)
 	}
 
-	pt("%+v\n", network.localNode)
+	if !network.Network.Contains(network.localNode.IP) {
+		t.Fatal()
+	}
 
 	//TODO
 }
