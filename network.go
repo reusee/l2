@@ -7,6 +7,8 @@ import (
 	"os"
 	"sync"
 
+	"github.com/google/gopacket"
+	"github.com/google/gopacket/layers"
 	"github.com/reusee/dscope"
 	"github.com/songgao/water"
 )
@@ -111,6 +113,22 @@ func (n *Network) Start() (err error) {
 	}
 	n.SetupInterfaces()
 
+	// outbounds
+	outboundPayloads := make(chan Bytes)
+	for _, iface := range n.ifaces {
+		iface := iface
+		go func() {
+			buf := make([]byte, n.MTU+14)
+			for {
+				n, err := iface.Read(buf)
+				ce(err, "read from interface")
+				payload := getBytes(n)
+				copy(payload.Bytes, buf[:n])
+				outboundPayloads <- payload
+			}
+		}()
+	}
+
 	// scope
 	closing := make(chan struct{})
 	n.closing = closing
@@ -139,6 +157,47 @@ func (n *Network) Start() (err error) {
 		}
 		spawn(scope, bridge.Start)
 	}
+
+	// handle outbounds
+	spawn(scope, func(
+		closing Closing,
+	) {
+		for {
+			select {
+
+			case bs := <-outboundPayloads:
+				payload := bs.Bytes
+
+				packet := gopacket.NewPacket(
+					payload,
+					layers.LayerTypeEthernet,
+					gopacket.DecodeOptions{
+						Lazy:   true,
+						NoCopy: true,
+					},
+				)
+				ethernet := packet.Layer(layers.LayerTypeEthernet).(*layers.Ethernet)
+				if ethernet.EthernetType != layers.EthernetTypeIPv4 &&
+					ethernet.EthernetType != layers.EthernetTypeARP {
+					break
+				}
+
+				pt("----------\n")
+				for _, layer := range packet.Layers() {
+					pt("%v\n", layer.LayerType())
+					pt("%T\n", layer)
+					pt("%+v\n", layer)
+				}
+				pt("\n\n\n\n")
+
+				bs.Put()
+
+			case <-closing:
+				return
+
+			}
+		}
+	})
 
 	return nil
 }
