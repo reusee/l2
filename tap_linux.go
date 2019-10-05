@@ -2,7 +2,6 @@ package l2
 
 import (
 	"net"
-	"time"
 
 	"github.com/songgao/water"
 	"github.com/vishvananda/netlink"
@@ -13,7 +12,7 @@ func (n *Network) SetupInterface() {
 	iface, err := water.New(water.Config{
 		DeviceType: interfaceType,
 		PlatformSpecificParams: water.PlatformSpecificParams{
-			Name:       time.Now().Format("TAP-20060102-150405-999"),
+			Name:       "L-" + n.localNode.LanIP.String(),
 			MultiQueue: true,
 		},
 	})
