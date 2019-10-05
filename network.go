@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"net"
 	"os"
+	"sync"
 
 	"github.com/reusee/dscope"
 	"github.com/songgao/water"
@@ -20,11 +21,15 @@ type Network struct {
 
 	localNode *Node
 	iface     *water.Interface
+	closing   chan struct{}
+	closed    sync.WaitGroup
 }
 
 type (
 	InterfaceAddrs []net.Addr
 	Hostname       string
+	Spawn          func(Scope, any)
+	Closing        chan struct{}
 )
 
 func (n *Network) Start() (err error) {
@@ -106,5 +111,32 @@ func (n *Network) Start() (err error) {
 	}
 	n.SetupInterface()
 
+	// scope
+	closing := make(chan struct{})
+	n.closing = closing
+	spawn := func(scope Scope, fn any) {
+		n.closed.Add(1)
+		go func() {
+			defer n.closed.Done()
+			scope.Call(fn)
+		}()
+	}
+	scope := dscope.New(
+		func() (
+			Spawn,
+			Closing,
+		) {
+			return spawn, closing
+		},
+	)
+
+	spawn(scope, func() {
+	})
+
 	return nil
+}
+
+func (n *Network) Close() {
+	close(n.closing)
+	n.closed.Wait()
 }

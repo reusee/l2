@@ -2,6 +2,7 @@ package l2
 
 import (
 	"net"
+	"runtime"
 	"testing"
 )
 
@@ -27,9 +28,17 @@ func TestAll(t *testing.T) {
 		Nodes: nodes,
 	}
 
+	numG := runtime.NumGoroutine()
 	if err := network.Start(); err != nil {
 		t.Fatal(err)
 	}
+	defer func() {
+		network.Close()
+		if numG != runtime.NumGoroutine() {
+			pt("%d %d\n", numG, runtime.NumGoroutine())
+			t.Fatalf("goroutine leaked")
+		}
+	}()
 
 	if !network.Network.Contains(network.localNode.IP) {
 		t.Fatal()

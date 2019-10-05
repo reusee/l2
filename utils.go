@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/rand"
 
+	"github.com/reusee/dscope"
 	"github.com/reusee/e/v2"
 )
 
@@ -16,8 +17,9 @@ var (
 )
 
 type (
-	dyn = interface{}
-	any = interface{}
+	dyn   = interface{}
+	any   = interface{}
+	Scope = dscope.Scope
 )
 
 func init() {
