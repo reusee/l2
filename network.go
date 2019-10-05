@@ -7,16 +7,19 @@ import (
 	"os"
 
 	"github.com/reusee/dscope"
+	"github.com/songgao/water"
 )
 
 type Network struct {
 	Network net.IPNet
 	Nodes   []*Node
 	Bridges []Bridge
+	MTU     int
 
 	SelectNode dyn
 
 	localNode *Node
+	iface     *water.Interface
 }
 
 type (
@@ -24,7 +27,8 @@ type (
 	Hostname       string
 )
 
-func (n *Network) Start() error {
+func (n *Network) Start() (err error) {
+	defer he(&err)
 
 	// get local node
 	var localNode *Node
@@ -96,7 +100,11 @@ func (n *Network) Start() error {
 		}
 	}
 
-	//TODO
+	// setup interface
+	if n.MTU == 0 {
+		n.MTU = 1300
+	}
+	n.SetupInterface()
 
 	return nil
 }
