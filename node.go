@@ -1,6 +1,9 @@
 package l2
 
-import "net"
+import (
+	"net"
+	"sync"
+)
 
 type Node struct {
 	LanIP       net.IP
@@ -9,6 +12,9 @@ type Node struct {
 
 	wanIP    net.IP
 	lanIPStr string
+
+	sync.RWMutex // guard the following fields
+	macAddrs     []net.HardwareAddr
 }
 
 func (n *Node) Init() {

@@ -4,8 +4,11 @@ import (
 	crand "crypto/rand"
 	"encoding/binary"
 	"fmt"
+	"hash/fnv"
 	"math/rand"
 
+	"github.com/google/gopacket"
+	"github.com/google/gopacket/layers"
 	"github.com/reusee/dscope"
 	"github.com/reusee/e/v2"
 )
@@ -26,4 +29,19 @@ func init() {
 	var seed int64
 	binary.Read(crand.Reader, binary.LittleEndian, &seed)
 	rand.Seed(seed)
+}
+
+func dumpEth(bs []byte) {
+	packet := gopacket.NewPacket(bs, layers.LayerTypeEthernet, gopacket.Default)
+	pt("-----------------\n")
+	for _, layer := range packet.Layers() {
+		pt("%v %T %+v\n", layer.LayerType(), layer, layer)
+	}
+	pt(".................\n")
+}
+
+func hash64(bs []byte) uint64 {
+	h := fnv.New64()
+	h.Write(bs)
+	return h.Sum64()
 }

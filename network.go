@@ -1,6 +1,7 @@
 package l2
 
 import (
+	"bytes"
 	"encoding/binary"
 	"math/rand"
 	"net"
@@ -35,6 +36,7 @@ type (
 	Hostname       string
 	Spawn          func(Scope, any)
 	Closing        chan struct{}
+	Ready          chan struct{}
 )
 
 func (n *Network) Start() (err error) {
@@ -147,6 +149,7 @@ func (n *Network) Start() (err error) {
 		}
 		outboundCh := make(chan Outbound, 1024)
 		outboundChans = append(outboundChans, outboundCh)
+		ready := make(chan struct{})
 		spawn(scope.Sub(
 			func() chan Outbound {
 				return outboundCh
@@ -154,13 +157,17 @@ func (n *Network) Start() (err error) {
 			func() chan Inbound {
 				return inboundChan
 			},
+			func() Ready {
+				return ready
+			},
 		), bridge.Start)
+		<-ready
 	}
 
-	// interface -> bridge
 	for _, iface := range n.ifaces {
 		iface := iface
 
+		// interface -> bridge
 		spawn(scope, func() {
 
 			buf := make([]byte, n.MTU+14)
@@ -191,21 +198,47 @@ func (n *Network) Start() (err error) {
 				var destNode *Node
 
 				parser.DecodeLayers(bs, &decoded)
+
 				for _, t := range decoded {
 					switch t {
 
 					case layers.LayerTypeEthernet:
-						if eth.EthernetType != layers.EthernetTypeIPv4 &&
-							eth.EthernetType != layers.EthernetTypeARP {
+						for _, node := range n.Nodes {
+							node.RLock()
+							for _, addr := range node.macAddrs {
+								if bytes.Equal(addr, eth.DstMAC) {
+									destNode = node
+								}
+							}
+							node.RUnlock()
+						}
+						if eth.EthernetType == layers.EthernetTypeIPv6 {
 							continue loop
 						}
 
 					case layers.LayerTypeARP:
-						isBroadcast = true
-						pt("%+v\n", arp)
+						ip := net.IP(arp.SourceProtAddress)
+						for _, node := range n.Nodes {
+							if node.LanIP.Equal(ip) {
+								node.Lock()
+								existed := false
+								hwAddr := net.HardwareAddr(arp.SourceHwAddress)
+								for _, addr := range node.macAddrs {
+									if bytes.Equal(addr, hwAddr) {
+										existed = true
+										break
+									}
+								}
+								if !existed {
+									node.macAddrs = append(node.macAddrs, hwAddr)
+								}
+								node.Unlock()
+							}
+						}
 
 					case layers.LayerTypeIPv4:
 						if !n.Network.Contains(ipv4.DstIP) {
+							pt("drop non-network\n")
 							continue loop
 						}
 
@@ -216,22 +249,97 @@ func (n *Network) Start() (err error) {
 					n.OnFrame(bs)
 				}
 
+				if destNode == nil {
+					isBroadcast = true
+				}
+
+				pt("%s %d read from interface\n", n.localNode.lanIPStr, hash64(bs))
+
+				if destNode != nil {
+					pt("%v\n", destNode)
+					dumpEth(bs)
+				}
+
 				for _, ch := range outboundChans {
 					eth := getBytes(l)
 					copy(eth.Bytes, bs)
-					ch <- Outbound{
+					select {
+					case ch <- Outbound{
 						Eth:         eth,
 						IsBroadcast: isBroadcast,
 						DestNode:    destNode,
+					}:
+					case <-closing:
+						eth.Put()
 					}
 				}
 
 			}
 		})
+
+		// interface <- bridge
+		spawn(scope, func(
+			closing Closing,
+		) {
+
+			parser := gopacket.NewDecodingLayerParser(layers.LayerTypeEthernet)
+			parser.SetDecodingLayerContainer(gopacket.DecodingLayerSparse(nil))
+			var eth layers.Ethernet
+			var arp layers.ARP
+			parser.AddDecodingLayer(&eth)
+			parser.AddDecodingLayer(&arp)
+			decoded := make([]gopacket.LayerType, 0, 10)
+
+			for {
+				select {
+
+				case inbound := <-inboundChan:
+					pt("%s %d write to interface\n", n.localNode.lanIPStr, hash64(inbound.Eth.Bytes))
+
+					parser.DecodeLayers(inbound.Eth.Bytes, &decoded)
+
+					for _, t := range decoded {
+						switch t {
+
+						case layers.LayerTypeARP:
+							ip := net.IP(arp.SourceProtAddress)
+							for _, node := range n.Nodes {
+								if node.LanIP.Equal(ip) {
+									node.Lock()
+									existed := false
+									hwAddr := net.HardwareAddr(arp.SourceHwAddress)
+									for _, addr := range node.macAddrs {
+										if bytes.Equal(addr, hwAddr) {
+											existed = true
+											break
+										}
+									}
+									if !existed {
+										node.macAddrs = append(node.macAddrs, hwAddr)
+									}
+									node.Unlock()
+								}
+							}
+
+						}
+					}
+
+					iface.Write(inbound.Eth.Bytes)
+
+					inbound.Eth.Put()
+
+				case <-closing:
+					return
+
+				}
+			}
+		})
+
 	}
 
 	// interface <- bridge
-	n.InjectFrame = make(chan []byte)
+	n.InjectFrame = make(chan []byte, 1024)
+
 	spawn(scope, func(
 		closing Closing,
 	) {

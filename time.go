@@ -32,7 +32,8 @@ var getTime = func() func() time.Time {
 		return func() time.Time {
 			return ntpTime0.Add(time.Since(sysTime0))
 		}
-	case <-time.After(time.Second * 10):
+	case <-time.After(time.Second * 3):
+		return time.Now
 		panic("get ntp time timeout")
 	}
 }()

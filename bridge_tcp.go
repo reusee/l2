@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"hash/fnv"
 	"net"
+	"strconv"
 	"time"
 )
 
 func startTCP(
+	ready Ready,
 	scope Scope,
 	network *Network,
 	closing Closing,
@@ -18,7 +20,7 @@ func startTCP(
 ) {
 
 	nodes := make(map[string]*Node)
-	for _, node := range nodes {
+	for _, node := range network.Nodes {
 		hasTCP := false
 		for _, name := range node.BridgeNames {
 			if name == "TCP" {
@@ -54,7 +56,7 @@ func startTCP(
 			fmt.Fprintf(f, "tcp-%s-%s-%d",
 				network.CryptoKey, node.lanIPStr, t.Unix(),
 			)
-			port := 10000 + f.Sum64()%55000
+			port := 10000 + f.Sum64()%45000
 			info.Time = t
 			info.Port = int(port)
 		}
@@ -66,7 +68,42 @@ func startTCP(
 		StartedAt time.Time
 	}
 	listeners := make(map[string]*Listener)
-	conns := make(map[*Node][]*net.TCPConn)
+	conns := make(map[*Node][]net.Conn)
+
+	doInLoopCh := make(chan func(), 1024)
+	doInLoop := func(fn func()) {
+		select {
+		case doInLoopCh <- fn:
+		case <-closing:
+		}
+	}
+
+	readConn := func(conn net.Conn) {
+		closeFunc := func() {
+			doInLoop(func() {
+				for node, cs := range conns {
+					for i := 0; i < len(cs); {
+						if cs[i] == conn {
+							cs = append(cs[:i], cs[i+1:]...)
+						}
+					}
+					conns[node] = cs
+				}
+			})
+		}
+		for {
+			inbound, err := network.readInbound(conn)
+			if err != nil {
+				doInLoop(closeFunc)
+				return
+			}
+			select {
+			case inboundCh <- inbound:
+			case <-closing:
+				inbound.Eth.Put()
+			}
+		}
+	}
 
 	refreshConns := func() {
 		for _, node := range nodes {
@@ -84,10 +121,12 @@ func startTCP(
 				}
 
 				// listen
-				ln, err := listenConfig.Listen(context.Background(), "tcp", fmt.Sprintf("0.0.0.0:%d", port))
+				hostPort := net.JoinHostPort(node.WanHost, strconv.Itoa(port))
+				ln, err := listenConfig.Listen(context.Background(), "tcp", hostPort)
 				if err != nil {
 					continue
 				}
+				pt("listen %s\n", hostPort)
 
 				spawn(scope, func() {
 					for {
@@ -95,8 +134,13 @@ func startTCP(
 						if err != nil {
 							return
 						}
-						conn.SetDeadline(getTime().Add(connDuration))
-						//TODO
+
+						spawn(scope, func() {
+							conn.SetDeadline(getTime().Add(connDuration))
+							//TODO add to conns
+							readConn(conn)
+						})
+
 					}
 				})
 
@@ -122,10 +166,14 @@ func startTCP(
 				spawn(scope, func() {
 					conn, err := dialer.Dial("tcp", tcpAddrStr)
 					if err != nil {
+						pt("%v\n", err)
 						return
 					}
 					conn.SetDeadline(getTime().Add(connDuration))
-					//TODO
+					doInLoop(func() {
+						conns[node] = append(conns[node], conn)
+					})
+					readConn(conn)
 				})
 
 			}
@@ -134,11 +182,63 @@ func startTCP(
 	}
 	refreshConns()
 
-	refreshConnsTicker := time.NewTicker(time.Second * 1)
-	listenerCheckTicker := time.NewTicker(time.Second * 1)
+	refreshConnsTicker := time.NewTicker(time.Millisecond * 500)
+	listenerCheckTicker := time.NewTicker(time.Second * 5)
+
+	close(ready)
 
 	for {
 		select {
+
+		case outbound := <-outboundCh:
+			func() {
+				defer outbound.Eth.Put()
+
+				pt("%s %d enter tcp\n", network.localNode.lanIPStr, hash64(outbound.Eth.Bytes))
+
+				sent := false
+
+				if outbound.IsBroadcast {
+					// broadcast
+				loop_node:
+					for node, cs := range conns {
+						if node == network.localNode {
+							continue
+						}
+						for _, conn := range cs {
+							if err := network.writeOutbound(conn, outbound); err != nil {
+								continue
+							} else {
+								sent = true
+								continue loop_node
+							}
+						}
+					}
+
+				} else if outbound.DestNode != nil {
+					// node
+					for _, conn := range conns[outbound.DestNode] {
+						if err := network.writeOutbound(conn, outbound); err != nil {
+							continue
+						} else {
+							sent = true
+							break
+						}
+					}
+
+				} else {
+					dumpEth(outbound.Eth.Bytes)
+					panic("not handled")
+				}
+
+				if !sent {
+					pt("%s %d not sent\n", network.localNode.lanIPStr, hash64(outbound.Eth.Bytes))
+					dumpEth(outbound.Eth.Bytes)
+					pt("%+v\n", outbound)
+					pt("%+v\n", outbound.DestNode)
+				}
+
+			}()
 
 		case <-refreshConnsTicker.C:
 			refreshConns()
@@ -151,6 +251,9 @@ func startTCP(
 					delete(listeners, addr)
 				}
 			}
+
+		case fn := <-doInLoopCh:
+			fn()
 
 		case <-closing:
 			for _, ln := range listeners {
