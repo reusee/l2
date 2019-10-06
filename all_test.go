@@ -5,6 +5,7 @@ import (
 	"net"
 	"runtime"
 	"strconv"
+	"sync"
 	"testing"
 
 	"github.com/vishvananda/netns"
@@ -134,7 +135,16 @@ func TestAll(t *testing.T) {
 	ln.Close()
 	<-closed1
 
-	network1.Close()
-	network2.Close()
+	wg := new(sync.WaitGroup)
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		network1.Close()
+	}()
+	go func() {
+		defer wg.Done()
+		network2.Close()
+	}()
+	wg.Wait()
 
 }
