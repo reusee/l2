@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net"
 	"runtime"
+	"strconv"
 	"testing"
 
 	"github.com/vishvananda/netns"
@@ -74,9 +75,14 @@ func TestAll(t *testing.T) {
 		go func() {
 			conn, err := ln.Accept()
 			ce(err)
-			var obj interface{}
-			ce(json.NewDecoder(conn).Decode(&obj))
-			ce(json.NewEncoder(conn).Encode(obj))
+			for {
+				var s string
+				ce(json.NewDecoder(conn).Decode(&s))
+				ce(json.NewEncoder(conn).Encode(s))
+				if s == "quit" {
+					break
+				}
+			}
 			conn.Close()
 			close(closed1)
 		}()
@@ -113,12 +119,16 @@ func TestAll(t *testing.T) {
 
 	conn, err := net.Dial("tcp", node1.LanIP.String()+":34567")
 	ce(err)
-	ce(json.NewEncoder(conn).Encode("foo"))
-	var s string
-	ce(json.NewDecoder(conn).Decode(&s))
-	if s != "foo" {
-		t.Fatal()
+	for i := 0; i < 1024; i++ {
+		input := strconv.Itoa(i)
+		ce(json.NewEncoder(conn).Encode(input))
+		var s string
+		ce(json.NewDecoder(conn).Decode(&s))
+		if s != input {
+			t.Fatal()
+		}
 	}
+	ce(json.NewEncoder(conn).Encode("quit"))
 	conn.Close()
 
 	ln.Close()

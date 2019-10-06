@@ -148,6 +148,7 @@ func (n *Network) Start() (err error) {
 	// interface -> bridge
 	for _, iface := range n.ifaces {
 		iface := iface
+
 		spawn(scope, func() {
 
 			buf := make([]byte, n.MTU+14)
