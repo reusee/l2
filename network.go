@@ -26,6 +26,7 @@ type Network struct {
 
 	localNode *Node
 	ifaces    []*water.Interface
+	ifaceMACs []net.HardwareAddr
 	closing   chan struct{}
 	waitClose sync.WaitGroup
 	closeOnce sync.Once
@@ -115,6 +116,17 @@ func (n *Network) Start() (err error) {
 		n.MTU = 1300
 	}
 	n.SetupInterfaces()
+	ifaces, err := net.Interfaces()
+	ce(err)
+	n.ifaceMACs = make([]net.HardwareAddr, len(n.ifaces))
+	for i, f1 := range n.ifaces {
+		for _, f2 := range ifaces {
+			if f2.Name == f1.Name() {
+				n.ifaceMACs[i] = f2.HardwareAddr
+				break
+			}
+		}
+	}
 
 	// scope
 	closing := make(chan struct{})
@@ -162,6 +174,34 @@ func (n *Network) Start() (err error) {
 			},
 		), bridge.Start)
 		<-ready
+	}
+
+	// mac address
+	updateNodeMAC2 := func(ipBytes []byte, mac []byte) {
+		ip := net.IP(ipBytes)
+		for _, node := range n.Nodes {
+			if node.LanIP.Equal(ip) {
+				node.Lock()
+				existed := false
+				hwAddr := net.HardwareAddr(mac)
+				for _, addr := range node.macAddrs {
+					if bytes.Equal(addr, hwAddr) {
+						existed = true
+						break
+					}
+				}
+				if !existed {
+					node.macAddrs = append(node.macAddrs, hwAddr)
+				}
+				node.Unlock()
+			}
+		}
+	}
+	updateNodeMAC := func(arp layers.ARP) {
+		updateNodeMAC2(arp.SourceProtAddress, arp.SourceHwAddress)
+		if arp.Operation == 2 {
+			updateNodeMAC2(arp.DstProtAddress, arp.DstHwAddress)
+		}
 	}
 
 	for _, iface := range n.ifaces {
@@ -217,28 +257,10 @@ func (n *Network) Start() (err error) {
 						}
 
 					case layers.LayerTypeARP:
-						ip := net.IP(arp.SourceProtAddress)
-						for _, node := range n.Nodes {
-							if node.LanIP.Equal(ip) {
-								node.Lock()
-								existed := false
-								hwAddr := net.HardwareAddr(arp.SourceHwAddress)
-								for _, addr := range node.macAddrs {
-									if bytes.Equal(addr, hwAddr) {
-										existed = true
-										break
-									}
-								}
-								if !existed {
-									node.macAddrs = append(node.macAddrs, hwAddr)
-								}
-								node.Unlock()
-							}
-						}
+						updateNodeMAC(arp)
 
 					case layers.LayerTypeIPv4:
 						if !n.Network.Contains(ipv4.DstIP) {
-							pt("drop non-network\n")
 							continue loop
 						}
 
@@ -251,13 +273,6 @@ func (n *Network) Start() (err error) {
 
 				if destNode == nil {
 					isBroadcast = true
-				}
-
-				pt("%s %d read from interface\n", n.localNode.lanIPStr, hash64(bs))
-
-				if destNode != nil {
-					pt("%v\n", destNode)
-					dumpEth(bs)
 				}
 
 				for _, ch := range outboundChans {
@@ -277,64 +292,6 @@ func (n *Network) Start() (err error) {
 			}
 		})
 
-		// interface <- bridge
-		spawn(scope, func(
-			closing Closing,
-		) {
-
-			parser := gopacket.NewDecodingLayerParser(layers.LayerTypeEthernet)
-			parser.SetDecodingLayerContainer(gopacket.DecodingLayerSparse(nil))
-			var eth layers.Ethernet
-			var arp layers.ARP
-			parser.AddDecodingLayer(&eth)
-			parser.AddDecodingLayer(&arp)
-			decoded := make([]gopacket.LayerType, 0, 10)
-
-			for {
-				select {
-
-				case inbound := <-inboundChan:
-					pt("%s %d write to interface\n", n.localNode.lanIPStr, hash64(inbound.Eth.Bytes))
-
-					parser.DecodeLayers(inbound.Eth.Bytes, &decoded)
-
-					for _, t := range decoded {
-						switch t {
-
-						case layers.LayerTypeARP:
-							ip := net.IP(arp.SourceProtAddress)
-							for _, node := range n.Nodes {
-								if node.LanIP.Equal(ip) {
-									node.Lock()
-									existed := false
-									hwAddr := net.HardwareAddr(arp.SourceHwAddress)
-									for _, addr := range node.macAddrs {
-										if bytes.Equal(addr, hwAddr) {
-											existed = true
-											break
-										}
-									}
-									if !existed {
-										node.macAddrs = append(node.macAddrs, hwAddr)
-									}
-									node.Unlock()
-								}
-							}
-
-						}
-					}
-
-					iface.Write(inbound.Eth.Bytes)
-
-					inbound.Eth.Put()
-
-				case <-closing:
-					return
-
-				}
-			}
-		})
-
 	}
 
 	// interface <- bridge
@@ -343,8 +300,45 @@ func (n *Network) Start() (err error) {
 	spawn(scope, func(
 		closing Closing,
 	) {
+
+		parser := gopacket.NewDecodingLayerParser(layers.LayerTypeEthernet)
+		parser.SetDecodingLayerContainer(gopacket.DecodingLayerSparse(nil))
+		var eth layers.Ethernet
+		var arp layers.ARP
+		parser.AddDecodingLayer(&eth)
+		parser.AddDecodingLayer(&arp)
+		decoded := make([]gopacket.LayerType, 0, 10)
+		broadcastMAC := []byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff}
+
 		for {
 			select {
+
+			case inbound := <-inboundChan:
+
+				parser.DecodeLayers(inbound.Eth.Bytes, &decoded)
+
+				for _, t := range decoded {
+					switch t {
+
+					case layers.LayerTypeARP:
+						updateNodeMAC(arp)
+
+					}
+				}
+
+				if bytes.Equal(eth.DstMAC, broadcastMAC) {
+					for _, iface := range n.ifaces {
+						iface.Write(inbound.Eth.Bytes)
+					}
+				} else {
+					for i, mac := range n.ifaceMACs {
+						if bytes.Equal(mac, eth.DstMAC) {
+							n.ifaces[i].Write(inbound.Eth.Bytes)
+						}
+					}
+				}
+
+				inbound.Eth.Put()
 
 			case bs := <-n.InjectFrame:
 				n.ifaces[0].Write(bs)

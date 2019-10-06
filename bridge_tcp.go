@@ -126,7 +126,6 @@ func startTCP(
 				if err != nil {
 					continue
 				}
-				pt("listen %s\n", hostPort)
 
 				spawn(scope, func() {
 					for {
@@ -166,7 +165,6 @@ func startTCP(
 				spawn(scope, func() {
 					conn, err := dialer.Dial("tcp", tcpAddrStr)
 					if err != nil {
-						pt("%v\n", err)
 						return
 					}
 					conn.SetDeadline(getTime().Add(connDuration))
@@ -182,7 +180,7 @@ func startTCP(
 	}
 	refreshConns()
 
-	refreshConnsTicker := time.NewTicker(time.Millisecond * 500)
+	refreshConnsTicker := time.NewTicker(time.Second * 1)
 	listenerCheckTicker := time.NewTicker(time.Second * 5)
 
 	close(ready)
@@ -193,8 +191,6 @@ func startTCP(
 		case outbound := <-outboundCh:
 			func() {
 				defer outbound.Eth.Put()
-
-				pt("%s %d enter tcp\n", network.localNode.lanIPStr, hash64(outbound.Eth.Bytes))
 
 				sent := false
 
@@ -232,10 +228,10 @@ func startTCP(
 				}
 
 				if !sent {
-					pt("%s %d not sent\n", network.localNode.lanIPStr, hash64(outbound.Eth.Bytes))
-					dumpEth(outbound.Eth.Bytes)
-					pt("%+v\n", outbound)
-					pt("%+v\n", outbound.DestNode)
+					//pt("%s %d not sent\n", network.localNode.lanIPStr, hash64(outbound.Eth.Bytes))
+					//dumpEth(outbound.Eth.Bytes)
+					//pt("%+v\n", outbound)
+					//pt("%+v\n", outbound.DestNode)
 				}
 
 			}()

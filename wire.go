@@ -23,7 +23,6 @@ func (n *Network) writeOutbound(w io.Writer, outbound Outbound) error {
 	if err != nil {
 		return err
 	}
-	pt("%s %d write to wire\n", n.localNode.lanIPStr, hash64(outbound.Eth.Bytes))
 	return nil
 }
 
@@ -37,7 +36,6 @@ func (n *Network) readInbound(r io.Reader) (inbound Inbound, err error) {
 		bs.Put()
 		return
 	}
-	pt("%s %d read from wire\n", n.localNode.lanIPStr, hash64(bs.Bytes))
 	inbound.Eth = bs
 	return
 }
