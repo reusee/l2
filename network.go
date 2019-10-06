@@ -136,33 +136,6 @@ func (n *Network) Start() (err error) {
 		},
 	)
 
-	// outbounds
-	outboundPayloads := make(chan Bytes)
-	for _, iface := range n.ifaces {
-		iface := iface
-		spawn(scope, func() {
-			buf := make([]byte, n.MTU+14)
-			for {
-				n, err := iface.Read(buf)
-				if err != nil {
-					select {
-					case <-closing:
-						return
-					default:
-						ce(err, "read from interface")
-					}
-				}
-				payload := getBytes(n)
-				copy(payload.Bytes, buf[:n])
-				select {
-				case outboundPayloads <- payload:
-				case <-closing:
-					return
-				}
-			}
-		})
-	}
-
 	// start bridges
 	for _, name := range localNode.BridgeNames {
 		bridge, ok := availableBridges[name]
@@ -172,29 +145,37 @@ func (n *Network) Start() (err error) {
 		spawn(scope, bridge.Start)
 	}
 
-	// handle outbounds
-	spawn(scope, func(
-		closing Closing,
-	) {
+	// interface -> bridge
+	for _, iface := range n.ifaces {
+		iface := iface
+		spawn(scope, func() {
 
-		parser := gopacket.NewDecodingLayerParser(layers.LayerTypeEthernet)
-		parser.SetDecodingLayerContainer(gopacket.DecodingLayerSparse(nil))
-		var eth layers.Ethernet
-		var arp layers.ARP
-		var ipv4 layers.IPv4
-		parser.AddDecodingLayer(&eth)
-		parser.AddDecodingLayer(&ipv4)
-		parser.AddDecodingLayer(&arp)
-		decoded := make([]gopacket.LayerType, 0, 10)
+			buf := make([]byte, n.MTU+14)
+			parser := gopacket.NewDecodingLayerParser(layers.LayerTypeEthernet)
+			parser.SetDecodingLayerContainer(gopacket.DecodingLayerSparse(nil))
+			var eth layers.Ethernet
+			var arp layers.ARP
+			var ipv4 layers.IPv4
+			parser.AddDecodingLayer(&eth)
+			parser.AddDecodingLayer(&ipv4)
+			parser.AddDecodingLayer(&arp)
+			decoded := make([]gopacket.LayerType, 0, 10)
 
-	loop:
-		for {
-			select {
+		loop:
+			for {
+				l, err := iface.Read(buf)
+				if err != nil {
+					select {
+					case <-closing:
+						return
+					default:
+						ce(err, "read from interface")
+					}
+				}
+				bs := getBytes(l)
+				copy(bs.Bytes, buf[:l])
 
-			case bs := <-outboundPayloads:
-				payload := bs.Bytes
-
-				parser.DecodeLayers(payload, &decoded)
+				parser.DecodeLayers(bs.Bytes, &decoded)
 				for _, t := range decoded {
 					switch t {
 
@@ -220,14 +201,11 @@ func (n *Network) Start() (err error) {
 
 				bs.Put()
 
-			case <-closing:
-				return
-
 			}
-		}
-	})
+		})
+	}
 
-	// handle inbounds
+	// interface <- bridge
 	n.InjectFrame = make(chan []byte)
 	spawn(scope, func(
 		closing Closing,
