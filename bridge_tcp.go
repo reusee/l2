@@ -6,6 +6,7 @@ import (
 	"hash/fnv"
 	"net"
 	"strconv"
+	"sync"
 	"time"
 )
 
@@ -17,6 +18,7 @@ func startTCP(
 	spawn Spawn,
 	outboundCh chan Outbound,
 	inboundCh chan Inbound,
+	inboundSenderGroup *sync.WaitGroup,
 ) {
 
 	nodes := make(map[string]*Node)
@@ -79,22 +81,26 @@ func startTCP(
 	}
 
 	readConn := func(conn net.Conn) {
-		closeFunc := func() {
-			doInLoop(func() {
-				for node, cs := range conns {
-					for i := 0; i < len(cs); {
-						if cs[i] == conn {
-							cs = append(cs[:i], cs[i+1:]...)
-						}
-					}
-					conns[node] = cs
-				}
-			})
-		}
+		inboundSenderGroup.Add(1)
+		defer inboundSenderGroup.Done()
 		for {
 			inbound, err := network.readInbound(conn)
 			if err != nil {
-				doInLoop(closeFunc)
+				conn.Close()
+				select {
+				case <-closing:
+				default:
+					doInLoop(func() {
+						for node, cs := range conns {
+							for i := 0; i < len(cs); {
+								if cs[i] == conn {
+									cs = append(cs[:i], cs[i+1:]...)
+								}
+							}
+							conns[node] = cs
+						}
+					})
+				}
 				return
 			}
 			select {
@@ -255,6 +261,12 @@ func startTCP(
 			for _, ln := range listeners {
 				ln.Listener.Close()
 			}
+			for _, cs := range conns {
+				for _, c := range cs {
+					c.SetDeadline(getTime().Add(-time.Hour))
+				}
+			}
+			return
 
 		}
 	}

@@ -30,6 +30,7 @@ type Network struct {
 	closing   chan struct{}
 	waitClose sync.WaitGroup
 	closeOnce sync.Once
+	onClose   []func()
 }
 
 type (
@@ -154,6 +155,7 @@ func (n *Network) Start() (err error) {
 	inboundChan := make(chan Inbound, 1024)
 
 	// start bridges
+	inboundSenderGroup := new(sync.WaitGroup)
 	for _, name := range localNode.BridgeNames {
 		bridge, ok := availableBridges[name]
 		if !ok {
@@ -172,9 +174,20 @@ func (n *Network) Start() (err error) {
 			func() Ready {
 				return ready
 			},
+			func() *sync.WaitGroup {
+				return inboundSenderGroup
+			},
 		), bridge.Start)
 		<-ready
 	}
+
+	n.onClose = append(n.onClose, func() {
+		inboundSenderGroup.Wait()
+		close(inboundChan)
+		for inbound := range inboundChan {
+			inbound.Eth.Put()
+		}
+	})
 
 	// mac address
 	updateNodeMAC2 := func(ipBytes []byte, mac []byte) {
@@ -204,11 +217,14 @@ func (n *Network) Start() (err error) {
 		}
 	}
 
+	outboundSenderGroup := new(sync.WaitGroup)
 	for _, iface := range n.ifaces {
 		iface := iface
+		outboundSenderGroup.Add(1)
 
 		// interface -> bridge
 		spawn(scope, func() {
+			defer outboundSenderGroup.Done()
 
 			buf := make([]byte, n.MTU+14)
 			parser := gopacket.NewDecodingLayerParser(layers.LayerTypeEthernet)
@@ -293,6 +309,18 @@ func (n *Network) Start() (err error) {
 		})
 
 	}
+	n.onClose = append(n.onClose, func() {
+		for _, iface := range n.ifaces {
+			iface.Close()
+		}
+		outboundSenderGroup.Wait()
+		for _, ch := range outboundChans {
+			close(ch)
+			for outbound := range ch {
+				outbound.Eth.Put()
+			}
+		}
+	})
 
 	// interface <- bridge
 	n.InjectFrame = make(chan []byte, 1024)
@@ -356,8 +384,8 @@ func (n *Network) Start() (err error) {
 func (n *Network) Close() {
 	n.closeOnce.Do(func() {
 		close(n.closing)
-		for _, iface := range n.ifaces {
-			iface.Close()
+		for _, fn := range n.onClose {
+			fn()
 		}
 		n.waitClose.Wait()
 	})
