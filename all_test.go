@@ -55,14 +55,14 @@ func TestAll(t *testing.T) {
 			SelectNode: func() *Node {
 				return node1
 			},
-			OnFrame: func(bs []byte) {
-				c := make([]byte, len(bs))
-				copy(c, bs)
-				select {
-				case network2.InjectFrame <- c:
-				case <-network2.closing:
-				}
-			},
+			//OnFrame: func(bs []byte) {
+			//	c := make([]byte, len(bs))
+			//	copy(c, bs)
+			//	select {
+			//	case network2.InjectFrame <- c:
+			//	case <-network2.closing:
+			//	}
+			//},
 		}
 		err = network1.Start()
 		ce(err)
@@ -102,14 +102,14 @@ func TestAll(t *testing.T) {
 		SelectNode: func() *Node {
 			return node2
 		},
-		OnFrame: func(bs []byte) {
-			c := make([]byte, len(bs))
-			copy(c, bs)
-			select {
-			case network1.InjectFrame <- c:
-			case <-network1.closing:
-			}
-		},
+		//OnFrame: func(bs []byte) {
+		//	c := make([]byte, len(bs))
+		//	copy(c, bs)
+		//	select {
+		//	case network1.InjectFrame <- c:
+		//	case <-network1.closing:
+		//	}
+		//},
 	}
 	err := network2.Start()
 	ce(err)

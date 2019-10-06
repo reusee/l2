@@ -103,11 +103,9 @@ func (n *Network) Start() (err error) {
 		n.Nodes = append(n.Nodes, localNode)
 	}
 
-	// default bridges
+	// nodes
 	for _, node := range n.Nodes {
-		if len(node.BridgeNames) == 0 {
-			node.BridgeNames = allBridgeNames
-		}
+		node.Init()
 	}
 
 	// setup interface
@@ -130,11 +128,16 @@ func (n *Network) Start() (err error) {
 		func() (
 			Spawn,
 			Closing,
+			*Network,
 		) {
 			return spawn,
-				closing
+				closing,
+				n
 		},
 	)
+
+	var outboundChans []chan Outbound
+	inboundChan := make(chan Inbound, 1024)
 
 	// start bridges
 	for _, name := range localNode.BridgeNames {
@@ -142,7 +145,16 @@ func (n *Network) Start() (err error) {
 		if !ok {
 			ce(me(nil, "no such bridge: %s", name))
 		}
-		spawn(scope, bridge.Start)
+		outboundCh := make(chan Outbound, 1024)
+		outboundChans = append(outboundChans, outboundCh)
+		spawn(scope.Sub(
+			func() chan Outbound {
+				return outboundCh
+			},
+			func() chan Inbound {
+				return inboundChan
+			},
+		), bridge.Start)
 	}
 
 	// interface -> bridge
@@ -173,10 +185,12 @@ func (n *Network) Start() (err error) {
 						ce(err, "read from interface")
 					}
 				}
-				bs := getBytes(l)
-				copy(bs.Bytes, buf[:l])
+				bs := buf[:l]
 
-				parser.DecodeLayers(bs.Bytes, &decoded)
+				isBroadcast := false
+				var destNode *Node
+
+				parser.DecodeLayers(bs, &decoded)
 				for _, t := range decoded {
 					switch t {
 
@@ -187,6 +201,8 @@ func (n *Network) Start() (err error) {
 						}
 
 					case layers.LayerTypeARP:
+						isBroadcast = true
+						pt("%+v\n", arp)
 
 					case layers.LayerTypeIPv4:
 						if !n.Network.Contains(ipv4.DstIP) {
@@ -197,10 +213,18 @@ func (n *Network) Start() (err error) {
 				}
 
 				if n.OnFrame != nil {
-					n.OnFrame(bs.Bytes)
+					n.OnFrame(bs)
 				}
 
-				bs.Put()
+				for _, ch := range outboundChans {
+					eth := getBytes(l)
+					copy(eth.Bytes, bs)
+					ch <- Outbound{
+						Eth:         eth,
+						IsBroadcast: isBroadcast,
+						DestNode:    destNode,
+					}
+				}
 
 			}
 		})
