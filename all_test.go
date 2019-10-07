@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/vishvananda/netns"
 )
@@ -166,7 +167,14 @@ func testPingPong(
 		t.Fatal()
 	}
 
+	retry := 10
+connect:
 	conn, err := net.Dial("tcp", network1.localNode.LanIP.String()+":34567")
+	if err != nil && retry > 0 {
+		time.Sleep(time.Millisecond * 200)
+		retry--
+		goto connect
+	}
 	ce(err)
 	var s string
 	for i := 0; i < 1024; i++ {
