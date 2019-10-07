@@ -52,9 +52,8 @@ func getBytes(size int) Bytes {
 }
 
 func (b Bytes) Put() {
-	if b.class == -1 {
-		return
+	if b.class >= 0 {
+		bytesPools[b.class].Put(b.Bytes)
 	}
-	bytesPools[b.class].Put(b.Bytes)
 	b.End()
 }
