@@ -22,7 +22,7 @@ func startTCP(
 ) {
 
 	nodes := make(map[string]*Node)
-	for _, node := range network.Nodes {
+	for _, node := range network.nodes.Load().([]*Node) {
 		hasTCP := false
 		for _, name := range node.BridgeNames {
 			if name == "TCP" {

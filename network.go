@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"sync"
+	"sync/atomic"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
@@ -16,7 +17,7 @@ import (
 
 type Network struct {
 	Network   net.IPNet
-	Nodes     []*Node
+	InitNodes []*Node
 	MTU       int
 	CryptoKey []byte
 
@@ -24,6 +25,7 @@ type Network struct {
 	OnFrame     func([]byte)
 	InjectFrame chan ([]byte)
 
+	nodes     atomic.Value
 	localNode *Node
 	ifaces    []*water.Interface
 	ifaceMACs []net.HardwareAddr
@@ -84,7 +86,7 @@ func (n *Network) Start() (err error) {
 		for i, b := range ip {
 			ip[i] = b | bs[i]
 		}
-		for _, node := range n.Nodes {
+		for _, node := range n.InitNodes {
 			if node.LanIP.Equal(ip) {
 				goto random_ip
 			}
@@ -97,20 +99,21 @@ func (n *Network) Start() (err error) {
 	// add local node to network
 	n.localNode = localNode
 	var existed bool
-	for _, node := range n.Nodes {
+	for _, node := range n.InitNodes {
 		if node.LanIP.Equal(localNode.LanIP) {
 			existed = true
 			break
 		}
 	}
 	if !existed {
-		n.Nodes = append(n.Nodes, localNode)
+		n.InitNodes = append(n.InitNodes, localNode)
 	}
 
 	// nodes
-	for _, node := range n.Nodes {
+	for _, node := range n.InitNodes {
 		node.Init()
 	}
+	n.nodes.Store(n.InitNodes)
 
 	// setup interface
 	if n.MTU == 0 {
@@ -192,7 +195,7 @@ func (n *Network) Start() (err error) {
 	// mac address
 	updateNodeMAC2 := func(ipBytes []byte, mac []byte) {
 		ip := net.IP(ipBytes)
-		for _, node := range n.Nodes {
+		for _, node := range n.nodes.Load().([]*Node) {
 			if node.LanIP.Equal(ip) {
 				node.Lock()
 				existed := false
@@ -259,7 +262,7 @@ func (n *Network) Start() (err error) {
 					switch t {
 
 					case layers.LayerTypeEthernet:
-						for _, node := range n.Nodes {
+						for _, node := range n.nodes.Load().([]*Node) {
 							node.RLock()
 							for _, addr := range node.macAddrs {
 								if bytes.Equal(addr, eth.DstMAC) {
