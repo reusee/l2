@@ -21,21 +21,6 @@ func startTCP(
 	inboundSenderGroup *sync.WaitGroup,
 ) {
 
-	nodes := make(map[string]*Node)
-	for _, node := range network.nodes.Load().([]*Node) {
-		hasTCP := false
-		for _, name := range node.BridgeNames {
-			if name == "TCP" {
-				hasTCP = true
-				break
-			}
-		}
-		if !hasTCP {
-			continue
-		}
-		nodes[node.lanIPStr] = node
-	}
-
 	portShiftInterval := time.Second * 11
 	listenerDuration := portShiftInterval + time.Second*59
 	connDuration := portShiftInterval + time.Second*10
@@ -112,7 +97,18 @@ func startTCP(
 	}
 
 	refreshConns := func() {
-		for _, node := range nodes {
+		for _, node := range network.nodes.Load().([]*Node) {
+			hasTCP := false
+			for _, name := range node.BridgeNames {
+				if name == "TCP" {
+					hasTCP = true
+					break
+				}
+			}
+			if !hasTCP {
+				continue
+			}
+
 			node := node
 			now := getTime()
 			port := getPort(node, now)
