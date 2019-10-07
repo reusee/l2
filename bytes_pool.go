@@ -36,7 +36,7 @@ func getBytes(size int) Bytes {
 		}
 	}
 	life := new(Life)
-	life.SetMax(time.Second * 50)
+	life.SetMax(time.Second * 1)
 	if class == len(bytesClasses) {
 		return Bytes{
 			Life:  life,
