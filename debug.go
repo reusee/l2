@@ -6,7 +6,7 @@ import (
 )
 
 func init() {
-	//TODO
+	return
 	go func() {
 		ce(http.ListenAndServe(":23456", nil))
 	}()
