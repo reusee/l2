@@ -112,18 +112,16 @@ func startTCP(
 			node := node
 			now := getTime()
 			port := getPort(node, now)
-			tcpAddr, err := net.ResolveTCPAddr("tcp", fmt.Sprintf("%s:%d", node.wanIP, port))
-			ce(err, "resolve tcp addr")
-			tcpAddrStr := tcpAddr.String()
 
 			if node == network.localNode {
+				hostPort := net.JoinHostPort(node.wanIP.String(), strconv.Itoa(port))
+
 				// local node, listen
-				if _, ok := listeners[tcpAddrStr]; ok {
+				if _, ok := listeners[hostPort]; ok {
 					continue
 				}
 
 				// listen
-				hostPort := net.JoinHostPort(node.WanHost, strconv.Itoa(port))
 				ln, err := listenConfig.Listen(context.Background(), "tcp", hostPort)
 				if err != nil {
 					continue
@@ -145,16 +143,18 @@ func startTCP(
 					}
 				})
 
-				listeners[tcpAddrStr] = &Listener{
+				listeners[hostPort] = &Listener{
 					Listener:  ln,
 					StartedAt: getTime(),
 				}
 
-			} else {
+			} else if node.WanHost != "" {
 				// non-local node
+
+				hostPort := net.JoinHostPort(node.wanIP.String(), strconv.Itoa(port))
 				exists := false
 				for _, c := range conns[node] {
-					if c.RemoteAddr().String() == tcpAddrStr {
+					if c.RemoteAddr().String() == hostPort {
 						exists = true
 						break
 					}
@@ -165,7 +165,7 @@ func startTCP(
 
 				// connect
 				spawn(scope, func() {
-					conn, err := dialer.Dial("tcp", tcpAddrStr)
+					conn, err := dialer.Dial("tcp", hostPort)
 					if err != nil {
 						return
 					}

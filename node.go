@@ -23,16 +23,15 @@ func (n *Node) Init() {
 		n.BridgeNames = allBridgeNames
 	}
 	// lookup host
-	if n.WanHost == "" {
-		n.WanHost = "127.0.0.1"
-	}
-	addrs, err := net.LookupHost(n.WanHost)
-	ce(err)
-	for _, addr := range addrs {
-		ip := net.ParseIP(addr)
-		if len(ip) > 0 {
-			n.wanIP = ip
-			break
+	if n.WanHost != "" {
+		addrs, err := net.LookupHost(n.WanHost)
+		ce(err)
+		for _, addr := range addrs {
+			ip := net.ParseIP(addr)
+			if len(ip) > 0 {
+				n.wanIP = ip
+				break
+			}
 		}
 	}
 	// ip string

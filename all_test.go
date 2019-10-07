@@ -13,10 +13,12 @@ import (
 
 func TestPingPongAllInitNodes(t *testing.T) {
 	node1 := &Node{
-		LanIP: net.IPv4(192, 168, 42, 1),
+		LanIP:   net.IPv4(192, 168, 42, 1),
+		WanHost: "localhost",
 	}
 	node2 := &Node{
-		LanIP: net.IPv4(192, 168, 42, 2),
+		LanIP:   net.IPv4(192, 168, 42, 2),
+		WanHost: "127.0.0.1",
 	}
 	nodes := []*Node{
 		node1, node2,
