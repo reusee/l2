@@ -241,6 +241,7 @@ func (n *Network) Start() (err error) {
 			parser.AddDecodingLayer(&ipv4)
 			parser.AddDecodingLayer(&arp)
 			decoded := make([]gopacket.LayerType, 0, 10)
+			serial := rand.Uint64()
 
 		loop:
 			for {
@@ -296,6 +297,7 @@ func (n *Network) Start() (err error) {
 					isBroadcast = true
 				}
 
+				sn := atomic.AddUint64(&serial, 1)
 				for _, ch := range outboundChans {
 					eth := getBytes(l)
 					copy(eth.Bytes, bs)
@@ -304,6 +306,7 @@ func (n *Network) Start() (err error) {
 						Eth:         eth,
 						IsBroadcast: isBroadcast,
 						DestNode:    destNode,
+						Serial:      sn,
 					}:
 					case <-closing:
 						eth.Put()
@@ -342,6 +345,8 @@ func (n *Network) Start() (err error) {
 		parser.AddDecodingLayer(&arp)
 		decoded := make([]gopacket.LayerType, 0, 10)
 		broadcastMAC := []byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff}
+		dedup := make(map[uint64][]uint64)
+		macBytes := make([]byte, 8)
 
 		for {
 			select {
@@ -350,60 +355,75 @@ func (n *Network) Start() (err error) {
 				if inbound == nil {
 					break
 				}
+				func() {
+					defer inbound.Eth.Put()
 
-				parser.DecodeLayers(inbound.Eth.Bytes, &decoded)
+					parser.DecodeLayers(inbound.Eth.Bytes, &decoded)
 
-				for _, t := range decoded {
-					switch t {
+					for _, t := range decoded {
+						switch t {
 
-					case layers.LayerTypeARP:
-						// check for new node
-						lanIP := make(net.IP, len(arp.SourceProtAddress))
-						copy(lanIP, arp.SourceProtAddress)
-						var newNodes []*Node
-						nodes := n.nodes.Load().([]*Node)
-						existed := false
-						for _, node := range nodes {
-							if node.LanIP.Equal(lanIP) {
-								existed = true
-								break
+						case layers.LayerTypeEthernet:
+							copy(macBytes, eth.SrcMAC)
+							macInt := binary.LittleEndian.Uint64(macBytes)
+							m, ok := dedup[macInt]
+							if !ok {
+								m = make([]uint64, 1<<17)
+								dedup[macInt] = m
+							}
+							if m[inbound.Serial%(1<<17)] == inbound.Serial {
+								return
+							}
+							m[inbound.Serial%(1<<17)] = inbound.Serial
+
+						case layers.LayerTypeARP:
+							// check for new node
+							lanIP := make(net.IP, len(arp.SourceProtAddress))
+							copy(lanIP, arp.SourceProtAddress)
+							var newNodes []*Node
+							nodes := n.nodes.Load().([]*Node)
+							existed := false
+							for _, node := range nodes {
+								if node.LanIP.Equal(lanIP) {
+									existed = true
+									break
+								}
+							}
+							if !existed {
+								macAddr := make(net.HardwareAddr, len(arp.SourceHwAddress))
+								copy(macAddr, arp.SourceHwAddress)
+								node := &Node{
+									LanIP:    lanIP,
+									macAddrs: []net.HardwareAddr{macAddr},
+								}
+								node.Init()
+								newNodes = append(newNodes, node)
+								if inbound.OnNodeFound != nil {
+									inbound.OnNodeFound(node)
+								}
+							}
+							if len(newNodes) > 0 {
+								n.nodes.Store(append(nodes, newNodes...))
+							}
+
+							updateNodeMAC(arp)
+
+						}
+					}
+
+					if bytes.Equal(eth.DstMAC, broadcastMAC) {
+						for _, iface := range n.ifaces {
+							iface.Write(inbound.Eth.Bytes)
+						}
+					} else {
+						for i, mac := range n.ifaceMACs {
+							if bytes.Equal(mac, eth.DstMAC) {
+								n.ifaces[i].Write(inbound.Eth.Bytes)
 							}
 						}
-						if !existed {
-							macAddr := make(net.HardwareAddr, len(arp.SourceHwAddress))
-							copy(macAddr, arp.SourceHwAddress)
-							node := &Node{
-								LanIP:    lanIP,
-								macAddrs: []net.HardwareAddr{macAddr},
-							}
-							node.Init()
-							newNodes = append(newNodes, node)
-							if inbound.OnNodeFound != nil {
-								inbound.OnNodeFound(node)
-							}
-						}
-						if len(newNodes) > 0 {
-							n.nodes.Store(append(nodes, newNodes...))
-						}
-
-						updateNodeMAC(arp)
-
 					}
-				}
 
-				if bytes.Equal(eth.DstMAC, broadcastMAC) {
-					for _, iface := range n.ifaces {
-						iface.Write(inbound.Eth.Bytes)
-					}
-				} else {
-					for i, mac := range n.ifaceMACs {
-						if bytes.Equal(mac, eth.DstMAC) {
-							n.ifaces[i].Write(inbound.Eth.Bytes)
-						}
-					}
-				}
-
-				inbound.Eth.Put()
+				}()
 
 			case bs := <-n.InjectFrame:
 				n.ifaces[0].Write(bs)
