@@ -12,10 +12,11 @@ type Outbound struct {
 }
 
 type Inbound struct {
-	Eth Bytes
+	Eth         Bytes
+	OnNodeFound func(*Node)
 }
 
-func (n *Network) writeOutbound(w io.Writer, outbound Outbound) error {
+func (n *Network) writeOutbound(w io.Writer, outbound *Outbound) error {
 	if err := binary.Write(w, binary.LittleEndian, uint16(len(outbound.Eth.Bytes))); err != nil {
 		return err
 	}

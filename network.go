@@ -156,8 +156,8 @@ func (n *Network) Start() (err error) {
 	)
 	n.Scope = scope
 
-	var outboundChans []chan Outbound
-	inboundChan := make(chan Inbound, 1024)
+	var outboundChans []chan *Outbound
+	inboundChan := make(chan *Inbound, 1024)
 
 	// start bridges
 	inboundSenderGroup := new(sync.WaitGroup)
@@ -166,14 +166,14 @@ func (n *Network) Start() (err error) {
 		if !ok {
 			ce(me(nil, "no such bridge: %s", name))
 		}
-		outboundCh := make(chan Outbound, 1024)
+		outboundCh := make(chan *Outbound, 1024)
 		outboundChans = append(outboundChans, outboundCh)
 		ready := make(chan struct{})
 		spawn(scope.Sub(
-			func() chan Outbound {
+			func() chan *Outbound {
 				return outboundCh
 			},
-			func() chan Inbound {
+			func() chan *Inbound {
 				return inboundChan
 			},
 			func() Ready {
@@ -300,7 +300,7 @@ func (n *Network) Start() (err error) {
 					eth := getBytes(l)
 					copy(eth.Bytes, bs)
 					select {
-					case ch <- Outbound{
+					case ch <- &Outbound{
 						Eth:         eth,
 						IsBroadcast: isBroadcast,
 						DestNode:    destNode,
@@ -347,6 +347,9 @@ func (n *Network) Start() (err error) {
 			select {
 
 			case inbound := <-inboundChan:
+				if inbound == nil {
+					break
+				}
 
 				parser.DecodeLayers(inbound.Eth.Bytes, &decoded)
 
@@ -354,6 +357,35 @@ func (n *Network) Start() (err error) {
 					switch t {
 
 					case layers.LayerTypeARP:
+						// check for new node
+						lanIP := make(net.IP, len(arp.SourceProtAddress))
+						copy(lanIP, arp.SourceProtAddress)
+						var newNodes []*Node
+						nodes := n.nodes.Load().([]*Node)
+						existed := false
+						for _, node := range nodes {
+							if node.LanIP.Equal(lanIP) {
+								existed = true
+								break
+							}
+						}
+						if !existed {
+							macAddr := make(net.HardwareAddr, len(arp.SourceHwAddress))
+							copy(macAddr, arp.SourceHwAddress)
+							node := &Node{
+								LanIP:    lanIP,
+								macAddrs: []net.HardwareAddr{macAddr},
+							}
+							node.Init()
+							newNodes = append(newNodes, node)
+							if inbound.OnNodeFound != nil {
+								inbound.OnNodeFound(node)
+							}
+						}
+						if len(newNodes) > 0 {
+							n.nodes.Store(append(nodes, newNodes...))
+						}
+
 						updateNodeMAC(arp)
 
 					}

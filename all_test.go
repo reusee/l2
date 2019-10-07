@@ -57,7 +57,8 @@ func TestPingPongAllInitNodes(t *testing.T) {
 
 func TestPingPongOneRandomNode(t *testing.T) {
 	node1 := &Node{
-		LanIP: net.IPv4(192, 168, 42, 1),
+		LanIP:   net.IPv4(192, 168, 42, 1),
+		WanHost: "localhost",
 	}
 	nodes := []*Node{
 		node1,

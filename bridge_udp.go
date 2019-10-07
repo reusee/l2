@@ -5,7 +5,7 @@ func startUDP(
 	scope Scope,
 	spawn Spawn,
 	closing Closing,
-	outboundCh chan Outbound,
+	outboundCh chan *Outbound,
 ) {
 
 	close(ready)

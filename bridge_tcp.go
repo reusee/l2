@@ -16,8 +16,8 @@ func startTCP(
 	network *Network,
 	closing Closing,
 	spawn Spawn,
-	outboundCh chan Outbound,
-	inboundCh chan Inbound,
+	outboundCh chan *Outbound,
+	inboundCh chan *Inbound,
 	inboundSenderGroup *sync.WaitGroup,
 ) {
 
@@ -70,12 +70,14 @@ func startTCP(
 		defer inboundSenderGroup.Done()
 		for {
 			inbound, err := network.readInbound(conn)
+
 			if err != nil {
 				conn.Close()
 				select {
 				case <-closing:
 				default:
 					doInLoop(func() {
+						// delete conn from conns
 						for node, cs := range conns {
 							for i := 0; i < len(cs); {
 								if cs[i] == conn {
@@ -88,8 +90,15 @@ func startTCP(
 				}
 				return
 			}
+
+			inbound.OnNodeFound = func(node *Node) {
+				doInLoop(func() {
+					conns[node] = append(conns[node], conn)
+				})
+			}
+
 			select {
-			case inboundCh <- inbound:
+			case inboundCh <- &inbound:
 			case <-closing:
 				inbound.Eth.Put()
 			}
@@ -136,7 +145,6 @@ func startTCP(
 
 						spawn(scope, func() {
 							conn.SetDeadline(getTime().Add(connDuration))
-							//TODO add to conns
 							readConn(conn)
 						})
 
@@ -191,6 +199,9 @@ func startTCP(
 		select {
 
 		case outbound := <-outboundCh:
+			if outbound == nil {
+				break
+			}
 			func() {
 				defer outbound.Eth.Put()
 
