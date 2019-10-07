@@ -21,6 +21,7 @@ type Network struct {
 	MTU       int
 	CryptoKey []byte
 
+	Scope       Scope
 	SelectNode  dyn
 	OnFrame     func([]byte)
 	InjectFrame chan ([]byte)
@@ -153,6 +154,7 @@ func (n *Network) Start() (err error) {
 				n
 		},
 	)
+	n.Scope = scope
 
 	var outboundChans []chan Outbound
 	inboundChan := make(chan Inbound, 1024)

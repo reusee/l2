@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"net"
 	"runtime"
-	"strconv"
+	"strings"
 	"sync"
 	"testing"
 
@@ -34,7 +34,6 @@ func TestAll(t *testing.T) {
 
 	// node1
 	var ln net.Listener
-	closed1 := make(chan struct{})
 	ok1 := make(chan struct{})
 	go func() {
 		runtime.LockOSThread()
@@ -56,14 +55,6 @@ func TestAll(t *testing.T) {
 			SelectNode: func() *Node {
 				return node1
 			},
-			//OnFrame: func(bs []byte) {
-			//	c := make([]byte, len(bs))
-			//	copy(c, bs)
-			//	select {
-			//	case network2.InjectFrame <- c:
-			//	case <-network2.closing:
-			//	}
-			//},
 		}
 		err = network1.Start()
 		ce(err)
@@ -73,67 +64,73 @@ func TestAll(t *testing.T) {
 
 		ln, err = net.Listen("tcp", node1.LanIP.String()+":34567")
 		ce(err)
-		go func() {
-			conn, err := ln.Accept()
-			ce(err)
-			for {
-				var s string
-				ce(json.NewDecoder(conn).Decode(&s))
-				ce(json.NewEncoder(conn).Encode(s))
-				if s == "quit" {
-					break
+		network1.Scope.Call(func(
+			spawn Spawn,
+			scope Scope,
+		) {
+			network1.onClose = append(network1.onClose, func() {
+				ln.Close()
+			})
+			spawn(scope, func() {
+				for {
+					conn, err := ln.Accept()
+					if err != nil {
+						return
+					}
+					spawn(scope, func() {
+						defer conn.Close()
+						for {
+							var s string
+							ce(json.NewDecoder(conn).Decode(&s))
+							ce(json.NewEncoder(conn).Encode(s))
+							if s == "quit" {
+								return
+							}
+						}
+					})
 				}
-			}
-			conn.Close()
-			close(closed1)
-		}()
+			})
+		})
 
 		close(ok1)
 	}()
-
 	<-ok1
-	network2 = &Network{
-		Network: net.IPNet{
-			IP:   net.IPv4(192, 168, 42, 0),
-			Mask: net.CIDRMask(24, 32),
-		},
-		InitNodes: nodes,
-		MTU:       1345,
-		CryptoKey: []byte("1234567890123456"),
-		SelectNode: func() *Node {
-			return node2
-		},
-		//OnFrame: func(bs []byte) {
-		//	c := make([]byte, len(bs))
-		//	copy(c, bs)
-		//	select {
-		//	case network1.InjectFrame <- c:
-		//	case <-network1.closing:
-		//	}
-		//},
-	}
-	err := network2.Start()
-	ce(err)
-	if !network2.Network.Contains(network2.localNode.LanIP) {
-		t.Fatal()
-	}
 
-	conn, err := net.Dial("tcp", node1.LanIP.String()+":34567")
-	ce(err)
-	for i := 0; i < 1024; i++ {
-		input := strconv.Itoa(i)
-		ce(json.NewEncoder(conn).Encode(input))
-		var s string
-		ce(json.NewDecoder(conn).Decode(&s))
-		if s != input {
+	t.Run("Node2", func(t *testing.T) {
+		network2 = &Network{
+			Network: net.IPNet{
+				IP:   net.IPv4(192, 168, 42, 0),
+				Mask: net.CIDRMask(24, 32),
+			},
+			InitNodes: nodes,
+			MTU:       1345,
+			CryptoKey: []byte("1234567890123456"),
+			SelectNode: func() *Node {
+				return node2
+			},
+		}
+		err := network2.Start()
+		ce(err)
+		if !network2.Network.Contains(network2.localNode.LanIP) {
 			t.Fatal()
 		}
-	}
-	ce(json.NewEncoder(conn).Encode("quit"))
-	conn.Close()
 
-	ln.Close()
-	<-closed1
+		conn, err := net.Dial("tcp", node1.LanIP.String()+":34567")
+		ce(err)
+		var s string
+		for i := 0; i < 1024; i++ {
+			input := strings.Repeat("foobar", i)
+			ce(json.NewEncoder(conn).Encode(input))
+			ce(json.NewDecoder(conn).Decode(&s))
+			if s != input {
+				t.Fatal()
+			}
+		}
+		ce(json.NewEncoder(conn).Encode("quit"))
+		ce(json.NewDecoder(conn).Decode(&s))
+		conn.Close()
+
+	})
 
 	wg := new(sync.WaitGroup)
 	wg.Add(2)
