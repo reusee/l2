@@ -28,7 +28,7 @@ const (
 
 type Inbound struct {
 	Eth         Bytes
-	OnNodeFound func(*Node)
+	UnknownNode func(*Node)
 	Serial      uint64
 }
 

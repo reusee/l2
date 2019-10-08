@@ -336,12 +336,48 @@ func (n *Network) Start() (err error) {
 		closing Closing,
 	) {
 
+		detectNode := func(
+			inbound *Inbound,
+			ip []byte,
+			mac []byte,
+		) {
+			if inbound.UnknownNode != nil {
+				lanIP := make(net.IP, len(ip))
+				copy(lanIP, ip)
+				var newNodes []*Node
+				nodes := n.nodes.Load().([]*Node)
+				var node *Node
+				for _, n := range nodes {
+					if n.LanIP.Equal(lanIP) {
+						node = n
+						break
+					}
+				}
+				if node == nil {
+					macAddr := make(net.HardwareAddr, len(mac))
+					copy(macAddr, mac)
+					node = &Node{
+						LanIP:    lanIP,
+						macAddrs: []net.HardwareAddr{macAddr},
+					}
+					node.Init()
+					newNodes = append(newNodes, node)
+				}
+				inbound.UnknownNode(node)
+				if len(newNodes) > 0 {
+					n.nodes.Store(append(nodes, newNodes...))
+				}
+			}
+		}
+
 		parser := gopacket.NewDecodingLayerParser(layers.LayerTypeEthernet)
 		parser.SetDecodingLayerContainer(gopacket.DecodingLayerSparse(nil))
 		var eth layers.Ethernet
 		var arp layers.ARP
+		var ipv4 layers.IPv4
 		parser.AddDecodingLayer(&eth)
 		parser.AddDecodingLayer(&arp)
+		parser.AddDecodingLayer(&ipv4)
 		decoded := make([]gopacket.LayerType, 0, 10)
 		broadcastMAC := []byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff}
 		dedup := make(map[uint64][]uint64)
@@ -376,45 +412,26 @@ func (n *Network) Start() (err error) {
 							m[inbound.Serial%(1<<17)] = inbound.Serial
 
 						case layers.LayerTypeARP:
-							// check for new node
-							lanIP := make(net.IP, len(arp.SourceProtAddress))
-							copy(lanIP, arp.SourceProtAddress)
-							var newNodes []*Node
-							nodes := n.nodes.Load().([]*Node)
-							existed := false
-							for _, node := range nodes {
-								if node.LanIP.Equal(lanIP) {
-									existed = true
-									break
-								}
-							}
-							if !existed {
-								macAddr := make(net.HardwareAddr, len(arp.SourceHwAddress))
-								copy(macAddr, arp.SourceHwAddress)
-								node := &Node{
-									LanIP:    lanIP,
-									macAddrs: []net.HardwareAddr{macAddr},
-								}
-								node.Init()
-								newNodes = append(newNodes, node)
-								if inbound.OnNodeFound != nil {
-									inbound.OnNodeFound(node)
-								}
-							}
-							if len(newNodes) > 0 {
-								n.nodes.Store(append(nodes, newNodes...))
-							}
-
+							detectNode(
+								inbound,
+								arp.SourceProtAddress,
+								arp.SourceHwAddress,
+							)
 							updateNodeMAC(arp)
+
+						case layers.LayerTypeIPv4:
+							detectNode(
+								inbound,
+								ipv4.SrcIP,
+								eth.SrcMAC,
+							)
 
 						}
 					}
 
 					if bytes.Equal(eth.DstMAC, broadcastMAC) {
-						for _, iface := range n.ifaces {
-							_, err := iface.Write(inbound.Eth.Bytes)
-							ce(err)
-						}
+						_, err := n.ifaces[rand.Intn(len(n.ifaces))].Write(inbound.Eth.Bytes)
+						ce(err)
 					} else {
 						for i, mac := range n.ifaceMACs {
 							if bytes.Equal(mac, eth.DstMAC) {

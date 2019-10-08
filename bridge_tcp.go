@@ -21,7 +21,7 @@ func startTCP(
 	inboundSenderGroup *sync.WaitGroup,
 ) {
 
-	portShiftInterval := time.Second * 11
+	portShiftInterval := time.Second * 7
 	listenerDuration := portShiftInterval + time.Second*59
 	connDuration := portShiftInterval + time.Second*10
 
@@ -81,9 +81,11 @@ func startTCP(
 		})
 	}
 
-	readConn := func(conn net.Conn) {
+	readConn := func(conn net.Conn, unknownNode bool) {
 		inboundSenderGroup.Add(1)
 		defer inboundSenderGroup.Done()
+		nodeRecognized := make(chan struct{})
+		var once sync.Once
 		for {
 			inbound, err := network.readInbound(conn)
 
@@ -97,10 +99,19 @@ func startTCP(
 				return
 			}
 
-			inbound.OnNodeFound = func(node *Node) {
-				doInLoop(func() {
-					conns[node] = append(conns[node], conn)
-				})
+			if unknownNode {
+				select {
+				case <-nodeRecognized:
+				default:
+					inbound.UnknownNode = func(node *Node) {
+						once.Do(func() {
+							doInLoop(func() {
+								conns[node] = append(conns[node], conn)
+							})
+							close(nodeRecognized)
+						})
+					}
+				}
 			}
 
 			select {
@@ -129,7 +140,6 @@ func startTCP(
 
 			if node == network.localNode && node.WanHost != "" {
 				port := getPort(node, now.Add(time.Millisecond*500))
-				//hostPort := net.JoinHostPort(node.wanIP.String(), strconv.Itoa(port))
 				hostPort := net.JoinHostPort("0.0.0.0", strconv.Itoa(port))
 
 				// local node, listen
@@ -152,7 +162,7 @@ func startTCP(
 
 						spawn(scope, func() {
 							conn.SetDeadline(getTime().Add(connDuration))
-							readConn(conn)
+							readConn(conn, true)
 						})
 
 					}
@@ -189,7 +199,7 @@ func startTCP(
 					doInLoop(func() {
 						conns[node] = append(conns[node], conn)
 					})
-					readConn(conn)
+					readConn(conn, false)
 				})
 
 			}
@@ -254,10 +264,10 @@ func startTCP(
 				}
 
 				if !sent {
-					//pt("%s %d not sent\n", network.localNode.lanIPStr, hash64(outbound.Eth.Bytes))
+					//pt("--- not sent ---\n")
+					//pt("serial %d\n", outbound.Serial)
 					//dumpEth(outbound.Eth.Bytes)
-					//pt("%+v\n", outbound)
-					//pt("%+v\n", outbound.DestNode)
+					//pt("conns %v\n", conns[outbound.DestNode])
 				}
 
 			}()
