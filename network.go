@@ -412,12 +412,14 @@ func (n *Network) Start() (err error) {
 
 					if bytes.Equal(eth.DstMAC, broadcastMAC) {
 						for _, iface := range n.ifaces {
-							iface.Write(inbound.Eth.Bytes)
+							_, err := iface.Write(inbound.Eth.Bytes)
+							ce(err)
 						}
 					} else {
 						for i, mac := range n.ifaceMACs {
 							if bytes.Equal(mac, eth.DstMAC) {
-								n.ifaces[i].Write(inbound.Eth.Bytes)
+								_, err := n.ifaces[i].Write(inbound.Eth.Bytes)
+								ce(err)
 							}
 						}
 					}
