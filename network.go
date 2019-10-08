@@ -26,8 +26,9 @@ type Network struct {
 	OnFrame     func([]byte)
 	InjectFrame chan ([]byte)
 
+	LocalNode *Node
+
 	nodes     atomic.Value
-	localNode *Node
 	ifaces    []*water.Interface
 	ifaceMACs []net.HardwareAddr
 	closing   chan struct{}
@@ -97,7 +98,7 @@ func (n *Network) Start() (err error) {
 	}
 
 	// add local node to network
-	n.localNode = localNode
+	n.LocalNode = localNode
 	var existed bool
 	for _, node := range n.InitNodes {
 		if node.LanIP.Equal(localNode.LanIP) {

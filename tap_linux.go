@@ -15,7 +15,7 @@ func (n *Network) SetupInterfaces() {
 		iface, err := water.New(water.Config{
 			DeviceType: interfaceType,
 			PlatformSpecificParams: water.PlatformSpecificParams{
-				Name:       fmt.Sprintf("L%d-", i) + n.localNode.LanIP.String(),
+				Name:       fmt.Sprintf("L%d-", i) + n.LocalNode.LanIP.String(),
 				MultiQueue: true,
 			},
 		})
@@ -27,7 +27,7 @@ func (n *Network) SetupInterfaces() {
 		ce(err)
 		err = netlink.AddrAdd(link, &netlink.Addr{
 			IPNet: &net.IPNet{
-				IP:   n.localNode.LanIP,
+				IP:   n.LocalNode.LanIP,
 				Mask: n.Network.Mask,
 			},
 		})

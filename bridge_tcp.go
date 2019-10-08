@@ -138,7 +138,7 @@ func startTCP(
 			node := node
 			now := getTime()
 
-			if node == network.localNode && node.WanHost != "" {
+			if node == network.LocalNode && node.WanHost != "" {
 				port := getPort(node, now.Add(time.Millisecond*500))
 				hostPort := net.JoinHostPort("0.0.0.0", strconv.Itoa(port))
 
@@ -229,7 +229,7 @@ func startTCP(
 					// broadcast
 				loop_node:
 					for node, cs := range conns {
-						if node == network.localNode {
+						if node == network.LocalNode {
 							continue
 						}
 						for i := len(cs) - 1; i >= 0; i-- {

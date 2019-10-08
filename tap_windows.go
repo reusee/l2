@@ -30,7 +30,7 @@ func (n *Network) SetupInterfaces() {
 		"address",
 		iface.Name(),
 		"static",
-		n.localNode.LanIP.String(),
+		n.LocalNode.LanIP.String(),
 		"255.255.255.0",
 		"none",
 		"1",
