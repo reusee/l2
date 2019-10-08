@@ -30,7 +30,6 @@ type Network struct {
 
 	nodes     atomic.Value
 	ifaces    []*water.Interface
-	ifaceMACs []net.HardwareAddr
 	closing   chan struct{}
 	waitClose sync.WaitGroup
 	closeOnce sync.Once
@@ -121,17 +120,6 @@ func (n *Network) Start() (err error) {
 		n.MTU = 1300
 	}
 	n.SetupInterfaces()
-	ifaces, err := net.Interfaces()
-	ce(err)
-	n.ifaceMACs = make([]net.HardwareAddr, len(n.ifaces))
-	for i, f1 := range n.ifaces {
-		for _, f2 := range ifaces {
-			if f2.Name == f1.Name() {
-				n.ifaceMACs[i] = f2.HardwareAddr
-				break
-			}
-		}
-	}
 
 	// scope
 	closing := make(chan struct{})
@@ -380,7 +368,6 @@ func (n *Network) Start() (err error) {
 		parser.AddDecodingLayer(&arp)
 		parser.AddDecodingLayer(&ipv4)
 		decoded := make([]gopacket.LayerType, 0, 10)
-		broadcastMAC := []byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff}
 		dedup := make(map[uint64][]uint64)
 		macBytes := make([]byte, 8)
 
@@ -430,17 +417,10 @@ func (n *Network) Start() (err error) {
 						}
 					}
 
-					if bytes.Equal(eth.DstMAC, broadcastMAC) {
-						_, err := n.ifaces[rand.Intn(len(n.ifaces))].Write(inbound.Eth.Bytes)
-						ce(err)
-					} else {
-						for i, mac := range n.ifaceMACs {
-							if bytes.Equal(mac, eth.DstMAC) {
-								_, err := n.ifaces[i].Write(inbound.Eth.Bytes)
-								ce(err)
-							}
-						}
+					for _, iface := range n.ifaces {
+						iface.Write(inbound.Eth.Bytes)
 					}
+					//TODO rc bytes
 
 				}()
 

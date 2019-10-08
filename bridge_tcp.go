@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"hash/fnv"
+	"math/rand"
 	"net"
 	"strconv"
 	"sync"
@@ -21,9 +22,9 @@ func startTCP(
 	inboundSenderGroup *sync.WaitGroup,
 ) {
 
-	portShiftInterval := time.Second * 7
-	listenerDuration := portShiftInterval + time.Second*59
-	connDuration := portShiftInterval + time.Second*10
+	portShiftInterval := time.Second * 11
+	listenerDuration := portShiftInterval * 2
+	connDuration := portShiftInterval * 16
 
 	type PortInfo struct {
 		Time time.Time
@@ -227,28 +228,34 @@ func startTCP(
 
 				if outbound.IsBroadcast {
 					// broadcast
-				loop_node:
-					for node, cs := range conns {
+					for node := range conns {
 						if node == network.LocalNode {
 							continue
 						}
-						for i := len(cs) - 1; i >= 0; i-- {
-							conn := cs[i]
+						for {
+							cs := conns[node]
+							if len(cs) == 0 {
+								break
+							}
+							conn := cs[rand.Intn(len(cs))]
 							if err := network.writeOutbound(conn, outbound); err != nil {
 								deleteConn(conn)
 								continue
 							} else {
 								sent = true
-								continue loop_node
+								break
 							}
 						}
 					}
 
 				} else if outbound.DestNode != nil {
 					// node
-					cs := conns[outbound.DestNode]
-					for i := len(cs) - 1; i >= 0; i-- {
-						conn := cs[i]
+					for {
+						cs := conns[outbound.DestNode]
+						if len(cs) == 0 {
+							break
+						}
+						conn := cs[rand.Intn(len(cs))]
 						if err := network.writeOutbound(conn, outbound); err != nil {
 							deleteConn(conn)
 							continue
@@ -264,10 +271,10 @@ func startTCP(
 				}
 
 				if !sent {
-					//pt("--- not sent ---\n")
-					//pt("serial %d\n", outbound.Serial)
-					//dumpEth(outbound.Eth.Bytes)
-					//pt("conns %v\n", conns[outbound.DestNode])
+					pt("--- not sent ---\n")
+					pt("serial %d\n", outbound.Serial)
+					dumpEth(outbound.Eth.Bytes)
+					pt("conns %v\n", conns[outbound.DestNode])
 				}
 
 			}()
