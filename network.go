@@ -37,11 +37,10 @@ type Network struct {
 }
 
 type (
-	InterfaceAddrs []net.Addr
-	Hostname       string
-	Spawn          func(Scope, any)
-	Closing        chan struct{}
-	Ready          chan struct{}
+	Hostname string
+	Spawn    func(Scope, any)
+	Closing  chan struct{}
+	Ready    chan struct{}
 )
 
 func (n *Network) Start() (err error) {
@@ -56,10 +55,10 @@ func (n *Network) Start() (err error) {
 		ce(err, "get host name")
 		dscope.New(
 			func() (
-				InterfaceAddrs,
+				[]net.Addr,
 				Hostname,
 			) {
-				return InterfaceAddrs(addrs),
+				return addrs,
 					Hostname(hostname)
 			},
 		).Call(n.SelectNode, &localNode)
