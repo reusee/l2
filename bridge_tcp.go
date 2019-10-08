@@ -65,6 +65,22 @@ func startTCP(
 		}
 	}
 
+	deleteConn := func(conn net.Conn) {
+		doInLoop(func() {
+			// delete conn from conns
+			for node, cs := range conns {
+				for i := 0; i < len(cs); {
+					if cs[i] == conn {
+						cs = append(cs[:i], cs[i+1:]...)
+						continue
+					}
+					i++
+				}
+				conns[node] = cs
+			}
+		})
+	}
+
 	readConn := func(conn net.Conn) {
 		inboundSenderGroup.Add(1)
 		defer inboundSenderGroup.Done()
@@ -76,17 +92,7 @@ func startTCP(
 				select {
 				case <-closing:
 				default:
-					doInLoop(func() {
-						// delete conn from conns
-						for node, cs := range conns {
-							for i := 0; i < len(cs); {
-								if cs[i] == conn {
-									cs = append(cs[:i], cs[i+1:]...)
-								}
-							}
-							conns[node] = cs
-						}
-					})
+					deleteConn(conn)
 				}
 				return
 			}
@@ -121,9 +127,10 @@ func startTCP(
 			node := node
 			now := getTime()
 
-			if node == network.localNode {
+			if node == network.localNode && node.WanHost != "" {
 				port := getPort(node, now.Add(time.Millisecond*500))
-				hostPort := net.JoinHostPort(node.wanIP.String(), strconv.Itoa(port))
+				//hostPort := net.JoinHostPort(node.wanIP.String(), strconv.Itoa(port))
+				hostPort := net.JoinHostPort("0.0.0.0", strconv.Itoa(port))
 
 				// local node, listen
 				if _, ok := listeners[hostPort]; ok {
@@ -215,8 +222,10 @@ func startTCP(
 						if node == network.localNode {
 							continue
 						}
-						for _, conn := range cs {
+						for i := len(cs) - 1; i >= 0; i-- {
+							conn := cs[i]
 							if err := network.writeOutbound(conn, outbound); err != nil {
+								deleteConn(conn)
 								continue
 							} else {
 								sent = true
@@ -227,8 +236,11 @@ func startTCP(
 
 				} else if outbound.DestNode != nil {
 					// node
-					for _, conn := range conns[outbound.DestNode] {
+					cs := conns[outbound.DestNode]
+					for i := len(cs) - 1; i >= 0; i-- {
+						conn := cs[i]
 						if err := network.writeOutbound(conn, outbound); err != nil {
+							deleteConn(conn)
 							continue
 						} else {
 							sent = true
