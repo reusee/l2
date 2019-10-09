@@ -2,6 +2,7 @@ package l2
 
 import (
 	"sync"
+	"time"
 )
 
 var bytesClasses, bytesPools = func() (
@@ -21,7 +22,7 @@ var bytesClasses, bytesPools = func() (
 }()
 
 type Bytes struct {
-	//*Life
+	*Life //TODO remove
 	Bytes []byte
 	class int
 }
@@ -34,17 +35,17 @@ func getBytes(size int) Bytes {
 			break
 		}
 	}
-	//life := new(Life)
-	//life.SetMax(time.Second * 60)
+	life := new(Life)
+	life.SetMax(time.Second * 5)
 	if class == len(bytesClasses) {
 		return Bytes{
-			//Life:  life,
+			Life:  life,
 			Bytes: make([]byte, size),
 			class: -1,
 		}
 	}
 	return Bytes{
-		//Life:  life,
+		Life:  life,
 		Bytes: bytesPools[class].Get().([]byte)[:size],
 		class: class,
 	}
@@ -54,5 +55,5 @@ func (b Bytes) Put() {
 	if b.class >= 0 {
 		bytesPools[b.class].Put(b.Bytes)
 	}
-	//b.End()
+	b.End()
 }

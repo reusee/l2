@@ -26,9 +26,9 @@ func startTCP(
 ) {
 
 	// port
-	portShiftInterval := time.Second * 11
+	portShiftInterval := time.Second * 5
 	listenerDuration := portShiftInterval * 2
-	connDuration := portShiftInterval * 16
+	connDuration := portShiftInterval * 3
 	type PortInfo struct {
 		Time time.Time
 		Port int
@@ -261,6 +261,7 @@ func startTCP(
 			}
 
 		}
+
 	}
 	refreshConns()
 
@@ -281,69 +282,56 @@ func startTCP(
 
 				sent := false
 
-				if outbound.DestAddr == nil {
-					// broadcast, send one frame per ip
-					sentIPs := make(map[string]bool)
-				loop_conn:
-					for i := len(conns) - 1; i >= 0; i-- {
-						conn := conns[i]
-						// ip
-						conn.RLock()
-						if len(conn.IPs) > 0 {
-							for _, ip := range conn.IPs {
-								if sentIPs[ip.String()] {
-									continue loop_conn
-								}
+				for i := len(conns) - 1; i >= 0; i-- {
+					conn := conns[i]
+
+					// filter
+					skip := false
+					ipMatched := false
+					addrMatched := false
+					conn.RLock()
+					if outbound.DestIP != nil && len(conn.IPs) > 0 {
+						ok := false
+						for _, ip := range conn.IPs {
+							if ip.Equal(*outbound.DestIP) {
+								ok = true
+								break
 							}
 						}
-						conn.RUnlock()
-						if err := network.writeOutbound(conn, outbound); err != nil {
-							deleteConn(conn)
-							continue
+						if !ok {
+							skip = true
+						} else {
+							ipMatched = true
 						}
-						sent = true
-						conn.RLock()
-						for _, ip := range conn.IPs {
-							sentIPs[ip.String()] = true
+					}
+					if outbound.DestAddr != nil && len(conn.Addrs) > 0 {
+						ok := false
+						for _, addr := range conn.Addrs {
+							if bytes.Equal(addr, *outbound.DestAddr) {
+								ok = true
+								break
+							}
 						}
-						conn.RUnlock()
+						if !ok {
+							skip = true
+						} else {
+							addrMatched = true
+						}
+					}
+					conn.RUnlock()
+					if skip {
+						continue
 					}
 
-				} else {
-				loop_conn2:
-					for i := len(conns) - 1; i >= 0; i-- {
-						conn := conns[i]
-						conn.RLock()
-						// ip
-						if outbound.DestIP != nil && len(conn.IPs) > 0 {
-							ok := false
-							for _, ip := range conn.IPs {
-								if ip.Equal(*outbound.DestIP) {
-									ok = true
-								}
-							}
-							if !ok {
-								continue loop_conn2
-							}
-						}
-						// addr
-						if outbound.DestAddr != nil && len(conn.Addrs) > 0 {
-							ok := false
-							for _, addr := range conn.Addrs {
-								if bytes.Equal(addr, *outbound.DestAddr) {
-									ok = true
-								}
-							}
-							if !ok {
-								continue loop_conn2
-							}
-						}
-						conn.RUnlock()
-						if err := network.writeOutbound(conn, outbound); err != nil {
-							deleteConn(conn)
-							continue
-						}
-						sent = true
+					// send
+					if err := network.writeOutbound(conn, outbound); err != nil {
+						deleteConn(conn)
+						continue
+					}
+					sent = true
+
+					if ipMatched || addrMatched {
+						break
 					}
 
 				}
