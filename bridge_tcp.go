@@ -23,6 +23,7 @@ func startTCP(
 	outboundCh chan *Outbound,
 	inboundCh chan *Inbound,
 	inboundSenderGroup *sync.WaitGroup,
+	getTime func() time.Time,
 ) {
 
 	// port

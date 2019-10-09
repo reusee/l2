@@ -8,7 +8,9 @@ import (
 	"os"
 	"sync"
 	"sync/atomic"
+	"time"
 
+	"github.com/beevik/ntp"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/reusee/dscope"
@@ -125,6 +127,38 @@ func (n *Network) Start() (err error) {
 	}
 	n.SetupInterfaces()
 
+	// utils
+	var getTime = func() func() time.Time {
+		servers := []string{
+			"time.cloudflare.com",
+			"cn.ntp.org.cn",
+		}
+		ret := make(chan time.Time, 1)
+		for _, server := range servers {
+			server := server
+			go func() {
+				t0, err := ntp.Time(server)
+				if err != nil {
+					return
+				}
+				select {
+				case ret <- t0:
+				default:
+				}
+			}()
+		}
+		select {
+		case ntpTime0 := <-ret:
+			ntpTime0 = ntpTime0.UTC()
+			sysTime0 := time.Now()
+			return func() time.Time {
+				return ntpTime0.Add(time.Since(sysTime0))
+			}
+		case <-time.After(time.Second * 3):
+			panic("get ntp time timeout")
+		}
+	}()
+
 	// scope
 	closing := make(chan struct{})
 	n.closing = closing
@@ -140,10 +174,12 @@ func (n *Network) Start() (err error) {
 			Spawn,
 			Closing,
 			*Network,
+			func() time.Time,
 		) {
 			return spawn,
 				closing,
-				n
+				n,
+				getTime
 		},
 	)
 	n.Scope = scope
