@@ -43,6 +43,10 @@ type (
 	Ready    chan struct{}
 )
 
+var (
+	EthernetBroadcast = net.HardwareAddr{0xff, 0xff, 0xff, 0xff, 0xff, 0xff}
+)
+
 func (n *Network) Start() (err error) {
 	defer he(&err)
 
@@ -182,34 +186,6 @@ func (n *Network) Start() (err error) {
 		}
 	})
 
-	// mac address
-	updateNodeMAC2 := func(ipBytes []byte, mac []byte) {
-		ip := net.IP(ipBytes)
-		for _, node := range n.nodes.Load().([]*Node) {
-			if node.LanIP.Equal(ip) {
-				node.Lock()
-				existed := false
-				hwAddr := net.HardwareAddr(mac)
-				for _, addr := range node.macAddrs {
-					if bytes.Equal(addr, hwAddr) {
-						existed = true
-						break
-					}
-				}
-				if !existed {
-					node.macAddrs = append(node.macAddrs, hwAddr)
-				}
-				node.Unlock()
-			}
-		}
-	}
-	updateNodeMAC := func(arp layers.ARP) {
-		updateNodeMAC2(arp.SourceProtAddress, arp.SourceHwAddress)
-		if arp.Operation == 2 {
-			updateNodeMAC2(arp.DstProtAddress, arp.DstHwAddress)
-		}
-	}
-
 	outboundSenderGroup := new(sync.WaitGroup)
 	for _, iface := range n.ifaces {
 		iface := iface
@@ -244,35 +220,40 @@ func (n *Network) Start() (err error) {
 				}
 				bs := buf[:l]
 
-				isBroadcast := false
-				var destNode *Node
-
+				var destIP *net.IP
+				var destAddr *net.HardwareAddr
 				parser.DecodeLayers(bs, &decoded)
 
 				for _, t := range decoded {
 					switch t {
 
 					case layers.LayerTypeEthernet:
-						for _, node := range n.nodes.Load().([]*Node) {
-							node.RLock()
-							for _, addr := range node.macAddrs {
-								if bytes.Equal(addr, eth.DstMAC) {
-									destNode = node
-								}
-							}
-							node.RUnlock()
-						}
+						// skip ipv6
 						if eth.EthernetType == layers.EthernetTypeIPv6 {
 							continue loop
 						}
+						// dest mac
+						if !bytes.Equal(eth.DstMAC, EthernetBroadcast) {
+							addr := make(net.HardwareAddr, len(eth.DstMAC))
+							copy(addr, eth.DstMAC)
+							destAddr = &addr
+						}
 
 					case layers.LayerTypeARP:
-						updateNodeMAC(arp)
+						// dest ip
+						ip := make(net.IP, len(arp.DstProtAddress))
+						copy(ip, arp.DstProtAddress)
+						destIP = &ip
 
 					case layers.LayerTypeIPv4:
+						// skip
 						if !n.Network.Contains(ipv4.DstIP) {
 							continue loop
 						}
+						// dest ip
+						ip := make(net.IP, len(ipv4.DstIP))
+						copy(ip, ipv4.DstIP)
+						destIP = &ip
 
 					}
 				}
@@ -281,20 +262,16 @@ func (n *Network) Start() (err error) {
 					n.OnFrame(bs)
 				}
 
-				if destNode == nil {
-					isBroadcast = true
-				}
-
 				sn := atomic.AddUint64(&serial, 1)
 				for _, ch := range outboundChans {
 					eth := getBytes(l)
 					copy(eth.Bytes, bs)
 					select {
 					case ch <- &Outbound{
-						Eth:         eth,
-						IsBroadcast: isBroadcast,
-						DestNode:    destNode,
-						Serial:      sn,
+						Eth:      eth,
+						Serial:   sn,
+						DestIP:   destIP,
+						DestAddr: destAddr,
 					}:
 					case <-closing:
 						eth.Put()
@@ -324,40 +301,6 @@ func (n *Network) Start() (err error) {
 	spawn(scope, func(
 		closing Closing,
 	) {
-
-		detectNode := func(
-			inbound *Inbound,
-			ip []byte,
-			mac []byte,
-		) {
-			if inbound.UnknownNode != nil {
-				lanIP := make(net.IP, len(ip))
-				copy(lanIP, ip)
-				var newNodes []*Node
-				nodes := n.nodes.Load().([]*Node)
-				var node *Node
-				for _, n := range nodes {
-					if n.LanIP.Equal(lanIP) {
-						node = n
-						break
-					}
-				}
-				if node == nil {
-					macAddr := make(net.HardwareAddr, len(mac))
-					copy(macAddr, mac)
-					node = &Node{
-						LanIP:    lanIP,
-						macAddrs: []net.HardwareAddr{macAddr},
-					}
-					node.Init()
-					newNodes = append(newNodes, node)
-				}
-				inbound.UnknownNode(node)
-				if len(newNodes) > 0 {
-					n.nodes.Store(append(nodes, newNodes...))
-				}
-			}
-		}
 
 		parser := gopacket.NewDecodingLayerParser(layers.LayerTypeEthernet)
 		parser.SetDecodingLayerContainer(gopacket.DecodingLayerSparse(nil))
@@ -399,28 +342,12 @@ func (n *Network) Start() (err error) {
 							}
 							m[inbound.Serial%(1<<17)] = inbound.Serial
 
-						case layers.LayerTypeARP:
-							detectNode(
-								inbound,
-								arp.SourceProtAddress,
-								arp.SourceHwAddress,
-							)
-							updateNodeMAC(arp)
-
-						case layers.LayerTypeIPv4:
-							detectNode(
-								inbound,
-								ipv4.SrcIP,
-								eth.SrcMAC,
-							)
-
 						}
 					}
 
 					for _, iface := range n.ifaces {
 						iface.Write(inbound.Eth.Bytes)
 					}
-					//TODO rc bytes
 
 				}()
 

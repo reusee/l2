@@ -8,12 +8,13 @@ import (
 	"fmt"
 	"io"
 	"math/rand"
+	"net"
 )
 
 type Outbound struct {
 	Eth          Bytes
-	IsBroadcast  bool
-	DestNode     *Node
+	DestIP       *net.IP
+	DestAddr     *net.HardwareAddr
 	Serial       uint64
 	PreferFormat WireFormat
 }
@@ -27,9 +28,8 @@ const (
 )
 
 type Inbound struct {
-	Eth         Bytes
-	UnknownNode func(*Node)
-	Serial      uint64
+	Eth    Bytes
+	Serial uint64
 }
 
 func (n *Network) writeOutbound(w io.Writer, outbound *Outbound) error {

@@ -122,11 +122,11 @@ func testPingPong(
 		network1 = getNetwork1()
 		err = network1.Start()
 		ce(err)
-		if !network1.Network.Contains(network1.localNode.LanIP) {
+		if !network1.Network.Contains(network1.LocalNode.LanIP) {
 			t.Fatal()
 		}
 
-		ln, err = net.Listen("tcp", network1.localNode.LanIP.String()+":34567")
+		ln, err = net.Listen("tcp", network1.LocalNode.LanIP.String()+":34567")
 		ce(err)
 		network1.Scope.Call(func(
 			spawn Spawn,
@@ -163,13 +163,13 @@ func testPingPong(
 	network2 := getNetwork2()
 	err := network2.Start()
 	ce(err)
-	if !network2.Network.Contains(network2.localNode.LanIP) {
+	if !network2.Network.Contains(network2.LocalNode.LanIP) {
 		t.Fatal()
 	}
 
 	retry := 10
 connect:
-	conn, err := net.Dial("tcp", network1.localNode.LanIP.String()+":34567")
+	conn, err := net.Dial("tcp", network1.LocalNode.LanIP.String()+":34567")
 	if err != nil && retry > 0 {
 		time.Sleep(time.Millisecond * 200)
 		retry--

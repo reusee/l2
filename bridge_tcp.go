@@ -1,14 +1,17 @@
 package l2
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"hash/fnv"
-	"math/rand"
 	"net"
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/google/gopacket"
+	"github.com/google/gopacket/layers"
 )
 
 func startTCP(
@@ -22,10 +25,10 @@ func startTCP(
 	inboundSenderGroup *sync.WaitGroup,
 ) {
 
+	// port
 	portShiftInterval := time.Second * 11
 	listenerDuration := portShiftInterval * 2
 	connDuration := portShiftInterval * 16
-
 	type PortInfo struct {
 		Time time.Time
 		Port int
@@ -51,13 +54,23 @@ func startTCP(
 		return info.Port
 	}
 
+	// listener
 	type Listener struct {
 		Listener  net.Listener
 		StartedAt time.Time
 	}
 	listeners := make(map[string]*Listener)
-	conns := make(map[*Node][]net.Conn)
 
+	// conn
+	type Conn struct {
+		sync.RWMutex
+		net.Conn
+		IPs   []net.IP
+		Addrs []net.HardwareAddr
+	}
+	var conns []*Conn
+
+	// sync callback
 	doInLoopCh := make(chan func(), 1024)
 	doInLoop := func(fn func()) {
 		select {
@@ -66,27 +79,39 @@ func startTCP(
 		}
 	}
 
-	deleteConn := func(conn net.Conn) {
+	// conn funcs
+	addConn := func(conn *Conn) {
+		doInLoop(func() {
+			conns = append(conns, conn)
+		})
+	}
+	deleteConn := func(conn *Conn) {
 		doInLoop(func() {
 			// delete conn from conns
-			for node, cs := range conns {
-				for i := 0; i < len(cs); {
-					if cs[i] == conn {
-						cs = append(cs[:i], cs[i+1:]...)
-						continue
-					}
-					i++
+			for i := 0; i < len(conns); {
+				if conns[i] == conn {
+					conns = append(conns[:i], conns[i+1:]...)
+					continue
 				}
-				conns[node] = cs
+				i++
 			}
 		})
 	}
 
-	readConn := func(conn net.Conn, unknownNode bool) {
+	readConn := func(conn *Conn) {
 		inboundSenderGroup.Add(1)
 		defer inboundSenderGroup.Done()
-		nodeRecognized := make(chan struct{})
-		var once sync.Once
+
+		parser := gopacket.NewDecodingLayerParser(layers.LayerTypeEthernet)
+		parser.SetDecodingLayerContainer(gopacket.DecodingLayerSparse(nil))
+		var eth layers.Ethernet
+		var arp layers.ARP
+		var ipv4 layers.IPv4
+		parser.AddDecodingLayer(&eth)
+		parser.AddDecodingLayer(&ipv4)
+		parser.AddDecodingLayer(&arp)
+		decoded := make([]gopacket.LayerType, 0, 10)
+
 		for {
 			inbound, err := network.readInbound(conn)
 
@@ -100,19 +125,40 @@ func startTCP(
 				return
 			}
 
-			if unknownNode {
-				select {
-				case <-nodeRecognized:
-				default:
-					inbound.UnknownNode = func(node *Node) {
-						once.Do(func() {
-							doInLoop(func() {
-								conns[node] = append(conns[node], conn)
-							})
-							close(nodeRecognized)
-						})
+			conn.RLock()
+			if len(conn.Addrs) == 0 || len(conn.IPs) == 0 {
+				conn.RUnlock()
+				parser.DecodeLayers(inbound.Eth.Bytes, &decoded)
+				for _, t := range decoded {
+					switch t {
+
+					case layers.LayerTypeEthernet:
+						if !bytes.Equal(eth.SrcMAC, EthernetBroadcast) {
+							addr := make(net.HardwareAddr, len(eth.SrcMAC))
+							copy(addr, eth.SrcMAC)
+							conn.Lock()
+							conn.Addrs = append(conn.Addrs, addr)
+							conn.Unlock()
+						}
+
+					case layers.LayerTypeARP:
+						ip := make(net.IP, len(arp.SourceProtAddress))
+						copy(ip, arp.SourceProtAddress)
+						conn.Lock()
+						conn.IPs = append(conn.IPs, ip)
+						conn.Unlock()
+
+					case layers.LayerTypeIPv4:
+						ip := make(net.IP, len(ipv4.SrcIP))
+						copy(ip, ipv4.SrcIP)
+						conn.Lock()
+						conn.IPs = append(conn.IPs, ip)
+						conn.Unlock()
+
 					}
 				}
+			} else {
+				conn.RUnlock()
 			}
 
 			select {
@@ -120,6 +166,7 @@ func startTCP(
 			case <-closing:
 				inbound.Eth.Put()
 			}
+
 		}
 	}
 
@@ -156,14 +203,18 @@ func startTCP(
 
 				spawn(scope, func() {
 					for {
-						conn, err := ln.Accept()
+						netConn, err := ln.Accept()
 						if err != nil {
 							return
 						}
 
 						spawn(scope, func() {
-							conn.SetDeadline(getTime().Add(connDuration))
-							readConn(conn, true)
+							netConn.SetDeadline(getTime().Add(connDuration))
+							conn := &Conn{
+								Conn: netConn,
+							}
+							addConn(conn)
+							readConn(conn)
 						})
 
 					}
@@ -180,7 +231,7 @@ func startTCP(
 				port := getPort(node, now)
 				hostPort := net.JoinHostPort(node.wanIP.String(), strconv.Itoa(port))
 				exists := false
-				for _, c := range conns[node] {
+				for _, c := range conns {
 					if c.RemoteAddr().String() == hostPort {
 						exists = true
 						break
@@ -192,15 +243,19 @@ func startTCP(
 
 				// connect
 				spawn(scope, func() {
-					conn, err := dialer.Dial("tcp", hostPort)
+					netConn, err := dialer.Dial("tcp", hostPort)
 					if err != nil {
 						return
 					}
-					conn.SetDeadline(getTime().Add(connDuration))
-					doInLoop(func() {
-						conns[node] = append(conns[node], conn)
-					})
-					readConn(conn, false)
+					netConn.SetDeadline(getTime().Add(connDuration))
+					conn := &Conn{
+						Conn: netConn,
+						IPs: []net.IP{
+							node.LanIP,
+						},
+					}
+					addConn(conn)
+					readConn(conn)
 				})
 
 			}
@@ -226,55 +281,78 @@ func startTCP(
 
 				sent := false
 
-				if outbound.IsBroadcast {
-					// broadcast
-					for node := range conns {
-						if node == network.LocalNode {
-							continue
-						}
-						for {
-							cs := conns[node]
-							if len(cs) == 0 {
-								break
-							}
-							conn := cs[rand.Intn(len(cs))]
-							if err := network.writeOutbound(conn, outbound); err != nil {
-								deleteConn(conn)
-								continue
-							} else {
-								sent = true
-								break
+				if outbound.DestAddr == nil {
+					// broadcast, send one frame per ip
+					sentIPs := make(map[string]bool)
+				loop_conn:
+					for i := len(conns) - 1; i >= 0; i-- {
+						conn := conns[i]
+						// ip
+						conn.RLock()
+						if len(conn.IPs) > 0 {
+							for _, ip := range conn.IPs {
+								if sentIPs[ip.String()] {
+									continue loop_conn
+								}
 							}
 						}
-					}
-
-				} else if outbound.DestNode != nil {
-					// node
-					for {
-						cs := conns[outbound.DestNode]
-						if len(cs) == 0 {
-							break
-						}
-						conn := cs[rand.Intn(len(cs))]
+						conn.RUnlock()
 						if err := network.writeOutbound(conn, outbound); err != nil {
 							deleteConn(conn)
 							continue
-						} else {
-							sent = true
-							break
 						}
+						sent = true
+						conn.RLock()
+						for _, ip := range conn.IPs {
+							sentIPs[ip.String()] = true
+						}
+						conn.RUnlock()
 					}
 
 				} else {
-					dumpEth(outbound.Eth.Bytes)
-					panic("not handled")
+				loop_conn2:
+					for i := len(conns) - 1; i >= 0; i-- {
+						conn := conns[i]
+						conn.RLock()
+						// ip
+						if outbound.DestIP != nil && len(conn.IPs) > 0 {
+							ok := false
+							for _, ip := range conn.IPs {
+								if ip.Equal(*outbound.DestIP) {
+									ok = true
+								}
+							}
+							if !ok {
+								continue loop_conn2
+							}
+						}
+						// addr
+						if outbound.DestAddr != nil && len(conn.Addrs) > 0 {
+							ok := false
+							for _, addr := range conn.Addrs {
+								if bytes.Equal(addr, *outbound.DestAddr) {
+									ok = true
+								}
+							}
+							if !ok {
+								continue loop_conn2
+							}
+						}
+						conn.RUnlock()
+						if err := network.writeOutbound(conn, outbound); err != nil {
+							deleteConn(conn)
+							continue
+						}
+						sent = true
+					}
+
 				}
 
 				if !sent {
-					pt("--- not sent ---\n")
-					pt("serial %d\n", outbound.Serial)
-					dumpEth(outbound.Eth.Bytes)
-					pt("conns %v\n", conns[outbound.DestNode])
+					//pt("--- not sent ---\n")
+					//pt("serial %d\n", outbound.Serial)
+					//dumpEth(outbound.Eth.Bytes)
+					//pt("conns %v\n", conns[outbound.DestNode])
 				}
 
 			}()
@@ -298,10 +376,8 @@ func startTCP(
 			for _, ln := range listeners {
 				ln.Listener.Close()
 			}
-			for _, cs := range conns {
-				for _, c := range cs {
-					c.SetDeadline(getTime().Add(-time.Hour))
-				}
+			for _, conn := range conns {
+				conn.SetDeadline(getTime().Add(-time.Hour))
 			}
 			return
 
