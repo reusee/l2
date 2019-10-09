@@ -180,10 +180,6 @@ func (n *Network) Start() (err error) {
 
 	n.onClose = append(n.onClose, func() {
 		inboundSenderGroup.Wait()
-		close(inboundChan)
-		for inbound := range inboundChan {
-			inbound.Eth.Put()
-		}
 	})
 
 	outboundSenderGroup := new(sync.WaitGroup)
@@ -265,8 +261,8 @@ func (n *Network) Start() (err error) {
 
 				sn := atomic.AddUint64(&serial, 1)
 				for _, ch := range outboundChans {
-					eth := getBytes(l)
-					copy(eth.Bytes, bs)
+					eth := make([]byte, l)
+					copy(eth, bs)
 					select {
 					case ch <- &Outbound{
 						Eth:      eth,
@@ -275,7 +271,6 @@ func (n *Network) Start() (err error) {
 						DestAddr: destAddr,
 					}:
 					case <-closing:
-						eth.Put()
 					}
 				}
 
@@ -304,12 +299,6 @@ func (n *Network) Start() (err error) {
 			iface.Close()
 		}
 		outboundSenderGroup.Wait()
-		for _, ch := range outboundChans {
-			close(ch)
-			for outbound := range ch {
-				outbound.Eth.Put()
-			}
-		}
 	})
 
 	// interface <- bridge
@@ -340,7 +329,7 @@ func (n *Network) Start() (err error) {
 					break
 				}
 
-				parser.DecodeLayers(inbound.Eth.Bytes, &decoded)
+				parser.DecodeLayers(inbound.Eth, &decoded)
 
 				for _, t := range decoded {
 					switch t {
@@ -354,7 +343,6 @@ func (n *Network) Start() (err error) {
 							dedup[macInt] = m
 						}
 						if m[inbound.Serial%(1<<17)] == inbound.Serial {
-							inbound.Eth.Put()
 							continue loop_inbound
 						}
 						m[inbound.Serial%(1<<17)] = inbound.Serial
@@ -362,14 +350,10 @@ func (n *Network) Start() (err error) {
 					}
 				}
 
-				num := int32(len(n.ifaces))
 				for i, ch := range ifaceDoChans {
 					i := i
 					ch <- func() {
-						n.ifaces[i].Write(inbound.Eth.Bytes)
-						if atomic.AddInt32(&num, -1) <= 0 {
-							inbound.Eth.Put()
-						}
+						n.ifaces[i].Write(inbound.Eth)
 					}
 				}
 

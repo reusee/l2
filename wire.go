@@ -12,7 +12,7 @@ import (
 )
 
 type Outbound struct {
-	Eth          Bytes
+	Eth          []byte
 	DestIP       *net.IP
 	DestAddr     *net.HardwareAddr
 	Serial       uint64
@@ -28,22 +28,21 @@ const (
 )
 
 type Inbound struct {
-	Eth    Bytes
+	Eth    []byte
 	Serial uint64
 }
 
 func (n *Network) writeOutbound(w io.Writer, outbound *Outbound) error {
-	plaintextBS := getBytes(
-		2 + // payload len
-			len(outbound.Eth.Bytes) + // payload
+	plaintextBS := make([]byte,
+		2+ // payload len
+			len(outbound.Eth)+ // payload
 			8, // serial
 	)
-	defer plaintextBS.Put()
-	buf := bytes.NewBuffer(plaintextBS.Bytes[:0])
-	if err := binary.Write(buf, binary.LittleEndian, uint16(len(outbound.Eth.Bytes))); err != nil {
+	buf := bytes.NewBuffer(plaintextBS[:0])
+	if err := binary.Write(buf, binary.LittleEndian, uint16(len(outbound.Eth))); err != nil {
 		return err
 	}
-	_, err := buf.Write(outbound.Eth.Bytes)
+	_, err := buf.Write(outbound.Eth)
 	if err != nil {
 		return err
 	}
@@ -63,29 +62,28 @@ func (n *Network) writeOutbound(w io.Writer, outbound *Outbound) error {
 		for i := 0; i+8 <= AESGCMNonceSize; i += 4 {
 			binary.LittleEndian.PutUint64(nonce[i:i+8], rand.Uint64())
 		}
-		buf := getBytes(
-			1 + // format
-				AESGCMNonceSize + // nonce
-				len(plaintext) + // plaintext
+		buf := make([]byte,
+			1+ // format
+				AESGCMNonceSize+ // nonce
+				len(plaintext)+ // plaintext
 				aead.Overhead(), // overhead
 		)
-		defer buf.Put()
-		buf.Bytes[0] = byte(FormatAESGCM)
+		buf[0] = byte(FormatAESGCM)
 		copy(
-			buf.Bytes[1:1+AESGCMNonceSize],
+			buf[1:1+AESGCMNonceSize],
 			nonce,
 		)
 		ciphertext := aead.Seal(
-			buf.Bytes[1+AESGCMNonceSize:1+AESGCMNonceSize],
+			buf[1+AESGCMNonceSize:1+AESGCMNonceSize],
 			nonce,
 			plaintext,
 			nil,
 		)
-		buf.Bytes = buf.Bytes[:1+AESGCMNonceSize+len(ciphertext)]
-		if err := binary.Write(w, binary.LittleEndian, uint16(len(buf.Bytes))); err != nil {
+		buf = buf[:1+AESGCMNonceSize+len(ciphertext)]
+		if err := binary.Write(w, binary.LittleEndian, uint16(len(buf))); err != nil {
 			return err
 		}
-		if _, err := w.Write(buf.Bytes); err != nil {
+		if _, err := w.Write(buf); err != nil {
 			return err
 		}
 
@@ -101,12 +99,11 @@ func (n *Network) readInbound(r io.Reader) (inbound Inbound, err error) {
 	if err = binary.Read(r, binary.LittleEndian, &l); err != nil {
 		return
 	}
-	ciphertextBs := getBytes(int(l))
-	defer ciphertextBs.Put()
-	if _, err = io.ReadFull(r, ciphertextBs.Bytes); err != nil {
+	ciphertextBs := make([]byte, int(l))
+	if _, err = io.ReadFull(r, ciphertextBs); err != nil {
 		return
 	}
-	ciphertext := ciphertextBs.Bytes
+	ciphertext := ciphertextBs
 
 	if len(ciphertext) == 0 {
 		err = errBadFrame
@@ -139,13 +136,8 @@ func (n *Network) readInbound(r io.Reader) (inbound Inbound, err error) {
 	if err = binary.Read(r, binary.LittleEndian, &l); err != nil {
 		return
 	}
-	bs := getBytes(int(l))
-	defer func() {
-		if err != nil {
-			bs.Put()
-		}
-	}()
-	if _, err = io.ReadFull(r, bs.Bytes); err != nil {
+	bs := make([]byte, int(l))
+	if _, err = io.ReadFull(r, bs); err != nil {
 		return
 	}
 	inbound.Eth = bs

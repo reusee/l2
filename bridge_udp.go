@@ -17,7 +17,7 @@ func startUDP(
 			return
 
 		case outbound := <-outboundCh:
-			outbound.Eth.Put()
+			_ = outbound
 
 		}
 	}

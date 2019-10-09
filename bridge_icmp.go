@@ -17,7 +17,7 @@ func startICMP(
 			return
 
 		case outbound := <-outboundCh:
-			outbound.Eth.Put()
+			_ = outbound
 
 		}
 	}

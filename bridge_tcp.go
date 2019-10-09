@@ -128,7 +128,7 @@ func startTCP(
 			conn.RLock()
 			if len(conn.Addrs) == 0 || len(conn.IPs) == 0 {
 				conn.RUnlock()
-				parser.DecodeLayers(inbound.Eth.Bytes, &decoded)
+				parser.DecodeLayers(inbound.Eth, &decoded)
 				for _, t := range decoded {
 					switch t {
 
@@ -164,7 +164,6 @@ func startTCP(
 			select {
 			case inboundCh <- &inbound:
 			case <-closing:
-				inbound.Eth.Put()
 			}
 
 		}
@@ -277,73 +276,69 @@ func startTCP(
 			if outbound == nil {
 				break
 			}
-			func() {
-				defer outbound.Eth.Put()
 
-				sent := false
+			sent := false
 
-				for i := len(conns) - 1; i >= 0; i-- {
-					conn := conns[i]
+			for i := len(conns) - 1; i >= 0; i-- {
+				conn := conns[i]
 
-					// filter
-					skip := false
-					ipMatched := false
-					addrMatched := false
-					conn.RLock()
-					if outbound.DestIP != nil && len(conn.IPs) > 0 {
-						ok := false
-						for _, ip := range conn.IPs {
-							if ip.Equal(*outbound.DestIP) {
-								ok = true
-								break
-							}
-						}
-						if !ok {
-							skip = true
-						} else {
-							ipMatched = true
+				// filter
+				skip := false
+				ipMatched := false
+				addrMatched := false
+				conn.RLock()
+				if outbound.DestIP != nil && len(conn.IPs) > 0 {
+					ok := false
+					for _, ip := range conn.IPs {
+						if ip.Equal(*outbound.DestIP) {
+							ok = true
+							break
 						}
 					}
-					if outbound.DestAddr != nil && len(conn.Addrs) > 0 {
-						ok := false
-						for _, addr := range conn.Addrs {
-							if bytes.Equal(addr, *outbound.DestAddr) {
-								ok = true
-								break
-							}
+					if !ok {
+						skip = true
+					} else {
+						ipMatched = true
+					}
+				}
+				if outbound.DestAddr != nil && len(conn.Addrs) > 0 {
+					ok := false
+					for _, addr := range conn.Addrs {
+						if bytes.Equal(addr, *outbound.DestAddr) {
+							ok = true
+							break
 						}
-						if !ok {
-							skip = true
-						} else {
-							addrMatched = true
-						}
 					}
-					conn.RUnlock()
-					if skip {
-						continue
+					if !ok {
+						skip = true
+					} else {
+						addrMatched = true
 					}
-
-					// send
-					if err := network.writeOutbound(conn, outbound); err != nil {
-						deleteConn(conn)
-						continue
-					}
-					sent = true
-
-					if ipMatched || addrMatched {
-						break
-					}
-
+				}
+				conn.RUnlock()
+				if skip {
+					continue
 				}
 
-				if !sent {
-					//pt("--- not sent ---\n")
-					//pt("serial %d\n", outbound.Serial)
-					//dumpEth(outbound.Eth.Bytes)
-					//pt("conns %v\n", conns[outbound.DestNode])
+				// send
+				if err := network.writeOutbound(conn, outbound); err != nil {
+					deleteConn(conn)
+					continue
+				}
+				sent = true
+
+				if ipMatched || addrMatched {
+					break
 				}
 
-			}()
+			}
+
+			if !sent {
+				//pt("--- not sent ---\n")
+				//pt("serial %d\n", outbound.Serial)
+				//dumpEth(outbound.Eth.Bytes)
+				//pt("conns %v\n", conns[outbound.DestNode])
+			}
 
 		case <-refreshConnsTicker.C:
 			refreshConns()
