@@ -42,6 +42,7 @@ func startUDP(
 
 	type Remote struct {
 		UDPAddr     *net.UDPAddr
+		UDPAddrStr  string
 		AddedAt     time.Time
 		LastReadAt  time.Time
 		WriteClosed *int
@@ -49,10 +50,11 @@ func startUDP(
 		Addrs       []net.HardwareAddr
 	}
 
-	remotes := make(map[string]*Remote)
+	var remotes []*Remote
 	locals := make(map[int]*Local)
 
 	updateRemotes := func() {
+	loop_nodes:
 		for _, node := range network.nodes.Load().([]*Node) {
 			hasUDP := false
 			for _, name := range node.BridgeNames {
@@ -76,17 +78,20 @@ func startUDP(
 				Port: remotePort,
 			}
 			udpAddrStr := udpAddr.String()
-			if _, ok := remotes[udpAddrStr]; ok {
-				continue
+			for _, remote := range remotes {
+				if remote.UDPAddrStr == udpAddrStr {
+					continue loop_nodes
+				}
 			}
-			remotes[udpAddrStr] = &Remote{
+			remotes = append(remotes, &Remote{
 				UDPAddr:    udpAddr,
+				UDPAddrStr: udpAddrStr,
 				AddedAt:    now,
 				LastReadAt: now,
 				IPs: []net.IP{
 					node.LanIP,
 				},
-			}
+			})
 		}
 	}
 	updateRemotes()
@@ -177,10 +182,13 @@ func startUDP(
 			// add remote
 			updateRemotes()
 			// delete remote
-			for k, remote := range remotes {
+			for i := 0; i < len(remotes); {
+				remote := remotes[i]
 				if now.Sub(remote.AddedAt) > remoteDuration {
-					delete(remotes, k)
+					remotes = append(remotes[:i], remotes[i+1:]...)
+					continue
 				}
+				i++
 			}
 
 		case inbound := <-inbounds:
@@ -190,13 +198,20 @@ func startUDP(
 				local.LastReadAt = now
 			}
 
-			remote, ok := remotes[addrStr]
-			if !ok {
-				remote = &Remote{
-					UDPAddr: inbound.RemoteAddr,
-					AddedAt: now,
+			var remote *Remote
+			for _, r := range remotes {
+				if r.UDPAddrStr == addrStr {
+					remote = r
+					break
 				}
-				remotes[addrStr] = remote
+			}
+			if remote == nil {
+				remote = &Remote{
+					UDPAddr:    inbound.RemoteAddr,
+					UDPAddrStr: addrStr,
+					AddedAt:    now,
+				}
+				remotes = append(remotes, remote)
 			}
 
 			remote.LastReadAt = now
@@ -248,7 +263,8 @@ func startUDP(
 
 			sent := false
 
-			for _, remote := range remotes {
+			for i := len(remotes) - 1; i >= 0; i-- {
+				remote := remotes[i]
 				if remote.WriteClosed != nil && *remote.WriteClosed <= 0 {
 					continue
 				}

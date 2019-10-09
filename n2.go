@@ -26,17 +26,17 @@ func main() {
 	nodeSH := &l2.Node{
 		LanIP:       net.IPv4(192, 168, 42, 1),
 		WanHost:     "sh.reus.mobi",
-		BridgeNames: []string{"TCP"},
+		BridgeNames: []string{"UDP"},
 	}
 	nodeHK := &l2.Node{
 		LanIP:       net.IPv4(192, 168, 42, 2),
 		WanHost:     "hk.reus.mobi",
-		BridgeNames: []string{"TCP"},
+		BridgeNames: []string{"UDP"},
 	}
 	nodeUS := &l2.Node{
 		LanIP:       net.IPv4(192, 168, 42, 3),
 		WanHost:     "us.reus.mobi",
-		BridgeNames: []string{"TCP"},
+		BridgeNames: []string{"UDP"},
 	}
 
 	network := &l2.Network{
