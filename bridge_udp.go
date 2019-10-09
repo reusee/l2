@@ -33,25 +33,21 @@ func startUDP(
 	)
 
 	type Local struct {
-		Conn        *net.UDPConn
-		Port        int
-		WriteClosed *int
-		StartedAt   time.Time
-		LastReadAt  time.Time
+		Conn      *net.UDPConn
+		Port      int
+		StartedAt time.Time
 	}
 
 	type Remote struct {
-		UDPAddr     *net.UDPAddr
-		UDPAddrStr  string
-		AddedAt     time.Time
-		LastReadAt  time.Time
-		WriteClosed *int
-		IPs         []net.IP
-		Addrs       []net.HardwareAddr
+		UDPAddr    *net.UDPAddr
+		UDPAddrStr string
+		AddedAt    time.Time
+		IPs        []net.IP
+		Addrs      []net.HardwareAddr
 	}
 
 	var remotes []*Remote
-	locals := make(map[int]*Local)
+	var locals []*Local
 
 	updateRemotes := func() {
 	loop_nodes:
@@ -87,7 +83,6 @@ func startUDP(
 				UDPAddr:    udpAddr,
 				UDPAddrStr: udpAddrStr,
 				AddedAt:    now,
-				LastReadAt: now,
 				IPs: []net.IP{
 					node.LanIP,
 				},
@@ -104,8 +99,10 @@ func startUDP(
 	inbounds := make(chan UDPInbound, 1024)
 
 	addLocal := func(port int) {
-		if _, ok := locals[port]; ok {
-			return
+		for _, local := range locals {
+			if local.Port == port {
+				return
+			}
 		}
 		udpAddr := &net.UDPAddr{
 			IP:   net.IPv4(0, 0, 0, 0),
@@ -115,19 +112,12 @@ func startUDP(
 		if err != nil {
 			return
 		}
-		for _, local := range locals {
-			if local.WriteClosed == nil {
-				n := 32
-				local.WriteClosed = &n
-			}
-		}
 		now := getTime()
-		locals[port] = &Local{
-			Conn:       conn,
-			Port:       port,
-			LastReadAt: now,
-			StartedAt:  now,
-		}
+		locals = append(locals, &Local{
+			Conn:      conn,
+			Port:      port,
+			StartedAt: now,
+		})
 
 		spawn(scope, func() {
 			bs := make([]byte, network.MTU*2)
@@ -173,11 +163,14 @@ func startUDP(
 			// add local conn
 			addLocal(getPort(network.LocalNode, getTime().Add(time.Second)))
 			// delete local conn
-			for port, local := range locals {
+			for i := 0; i < len(locals); {
+				local := locals[i]
 				if now.Sub(local.StartedAt) > localConnDuration {
 					local.Conn.Close()
-					delete(locals, port)
+					locals = append(locals[:i], locals[i+1:]...)
+					continue
 				}
+				i++
 			}
 			// add remote
 			updateRemotes()
@@ -194,9 +187,6 @@ func startUDP(
 		case inbound := <-inbounds:
 			addrStr := inbound.RemoteAddr.String()
 			now := getTime()
-			if local, ok := locals[inbound.LocalPort]; ok {
-				local.LastReadAt = now
-			}
 
 			var remote *Remote
 			for _, r := range remotes {
@@ -213,17 +203,6 @@ func startUDP(
 				}
 				remotes = append(remotes, remote)
 			}
-
-			remote.LastReadAt = now
-			// deprecate other same ip old remotes TODO
-			//for _, r := range remotes {
-			//	if r.Number == remote.Number && r.AddedAt.Before(remote.AddedAt) {
-			//		if r.WriteClosed == nil {
-			//			n := 32
-			//			r.WriteClosed = &n
-			//		}
-			//	}
-			//}
 
 			if len(remote.Addrs) == 0 || len(remote.IPs) == 0 {
 				parser.DecodeLayers(inbound.Inbound.Eth, &decoded)
@@ -265,9 +244,6 @@ func startUDP(
 
 			for i := len(remotes) - 1; i >= 0; i-- {
 				remote := remotes[i]
-				if remote.WriteClosed != nil && *remote.WriteClosed <= 0 {
-					continue
-				}
 
 				// filter
 				skip := false
@@ -306,21 +282,13 @@ func startUDP(
 				}
 
 				// send
-				for _, local := range locals {
-					if local.WriteClosed != nil && *local.WriteClosed <= 0 {
-						continue
-					}
+				if len(locals) > 0 {
+					local := locals[len(locals)-1]
 					buf := new(bytes.Buffer)
 					ce(network.writeOutbound(buf, outbound))
 					_, err := local.Conn.WriteToUDP(buf.Bytes(), remote.UDPAddr)
 					if err != nil {
 						continue
-					}
-					if remote.WriteClosed != nil {
-						*remote.WriteClosed--
-					}
-					if local.WriteClosed != nil {
-						*local.WriteClosed--
 					}
 					sent = true
 				}
