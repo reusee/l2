@@ -296,9 +296,9 @@ func (n *Network) Start() (err error) {
 				}
 
 				sn := atomic.AddUint64(&serial, 1)
+				eth := make([]byte, l)
+				copy(eth, bs)
 				for _, ch := range outboundChans {
-					eth := make([]byte, l)
-					copy(eth, bs)
 					select {
 					case ch <- &Outbound{
 						Eth:      eth,
