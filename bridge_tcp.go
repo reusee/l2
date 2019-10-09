@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"hash/fnv"
 	"net"
 	"strconv"
 	"sync"
@@ -30,30 +29,10 @@ func startTCP(
 	portShiftInterval := time.Second * 5
 	listenerDuration := portShiftInterval * 2
 	connDuration := portShiftInterval * 3
-	type PortInfo struct {
-		Time time.Time
-		Port int
-	}
-	portInfos := make(map[*Node]*PortInfo)
-	getPort := func(node *Node, t time.Time) int {
-		t = t.Round(portShiftInterval)
-		info, ok := portInfos[node]
-		if !ok {
-			info = new(PortInfo)
-			portInfos[node] = info
-		}
-		if t != info.Time {
-			// shift
-			f := fnv.New64a()
-			fmt.Fprintf(f, "tcp-%s-%s-%d",
-				network.CryptoKey, node.lanIPStr, t.Unix(),
-			)
-			port := 10000 + f.Sum64()%45000
-			info.Time = t
-			info.Port = int(port)
-		}
-		return info.Port
-	}
+	getPort := shiftingPort(
+		fmt.Sprintf("%x-tcp-", network.CryptoKey),
+		portShiftInterval,
+	)
 
 	// listener
 	type Listener struct {
