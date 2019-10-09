@@ -187,6 +187,7 @@ func (n *Network) Start() (err error) {
 	})
 
 	outboundSenderGroup := new(sync.WaitGroup)
+	var ifaceDoChans []chan func()
 	for _, iface := range n.ifaces {
 		iface := iface
 		outboundSenderGroup.Add(1)
@@ -281,6 +282,22 @@ func (n *Network) Start() (err error) {
 			}
 		})
 
+		// bridge -> interface
+		doChan := make(chan func(), 1024)
+		ifaceDoChans = append(ifaceDoChans, doChan)
+		spawn(scope, func(
+			closing Closing,
+		) {
+			for {
+				select {
+				case <-closing:
+					return
+				case fn := <-doChan:
+					fn()
+				}
+			}
+		})
+
 	}
 	n.onClose = append(n.onClose, func() {
 		for _, iface := range n.ifaces {
@@ -314,6 +331,7 @@ func (n *Network) Start() (err error) {
 		dedup := make(map[uint64][]uint64)
 		macBytes := make([]byte, 8)
 
+	loop_inbound:
 		for {
 			select {
 
@@ -321,35 +339,39 @@ func (n *Network) Start() (err error) {
 				if inbound == nil {
 					break
 				}
-				func() {
-					defer inbound.Eth.Put()
 
-					parser.DecodeLayers(inbound.Eth.Bytes, &decoded)
+				parser.DecodeLayers(inbound.Eth.Bytes, &decoded)
 
-					for _, t := range decoded {
-						switch t {
+				for _, t := range decoded {
+					switch t {
 
-						case layers.LayerTypeEthernet:
-							copy(macBytes, eth.SrcMAC)
-							macInt := binary.LittleEndian.Uint64(macBytes)
-							m, ok := dedup[macInt]
-							if !ok {
-								m = make([]uint64, 1<<17)
-								dedup[macInt] = m
-							}
-							if m[inbound.Serial%(1<<17)] == inbound.Serial {
-								return
-							}
-							m[inbound.Serial%(1<<17)] = inbound.Serial
+					case layers.LayerTypeEthernet:
+						copy(macBytes, eth.SrcMAC)
+						macInt := binary.LittleEndian.Uint64(macBytes)
+						m, ok := dedup[macInt]
+						if !ok {
+							m = make([]uint64, 1<<17)
+							dedup[macInt] = m
+						}
+						if m[inbound.Serial%(1<<17)] == inbound.Serial {
+							inbound.Eth.Put()
+							continue loop_inbound
+						}
+						m[inbound.Serial%(1<<17)] = inbound.Serial
 
+					}
+				}
+
+				num := int32(len(n.ifaces))
+				for i, ch := range ifaceDoChans {
+					i := i
+					ch <- func() {
+						n.ifaces[i].Write(inbound.Eth.Bytes)
+						if atomic.AddInt32(&num, -1) <= 0 {
+							inbound.Eth.Put()
 						}
 					}
-
-					for _, iface := range n.ifaces {
-						iface.Write(inbound.Eth.Bytes)
-					}
-
-				}()
+				}
 
 			case bs := <-n.InjectFrame:
 				n.ifaces[0].Write(bs)
