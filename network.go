@@ -181,6 +181,7 @@ func (n *Network) Start() (err error) {
 				n,
 				getTime
 		},
+		Ev,
 	)
 	n.Scope = scope
 

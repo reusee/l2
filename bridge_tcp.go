@@ -13,6 +13,18 @@ import (
 	"github.com/google/gopacket/layers"
 )
 
+type TCPListener struct {
+	Listener  net.Listener
+	StartedAt time.Time
+}
+
+type TCPConn struct {
+	sync.RWMutex
+	net.Conn
+	IPs   []net.IP
+	Addrs []net.HardwareAddr
+}
+
 func startTCP(
 	ready Ready,
 	scope Scope,
@@ -23,6 +35,7 @@ func startTCP(
 	inboundCh chan *Inbound,
 	inboundSenderGroup *sync.WaitGroup,
 	getTime func() time.Time,
+	trigger Trigger,
 ) {
 
 	// port
@@ -35,20 +48,10 @@ func startTCP(
 	)
 
 	// listener
-	type Listener struct {
-		Listener  net.Listener
-		StartedAt time.Time
-	}
-	listeners := make(map[string]*Listener)
+	listeners := make(map[string]*TCPListener)
 
 	// conn
-	type Conn struct {
-		sync.RWMutex
-		net.Conn
-		IPs   []net.IP
-		Addrs []net.HardwareAddr
-	}
-	var conns []*Conn
+	var conns []*TCPConn
 
 	// sync callback
 	doInLoopCh := make(chan func(), 1024)
@@ -60,17 +63,27 @@ func startTCP(
 	}
 
 	// conn funcs
-	addConn := func(conn *Conn) {
+	addConn := func(conn *TCPConn) {
 		doInLoop(func() {
 			conns = append(conns, conn)
+			trigger(scope.Sub(
+				func() *TCPConn {
+					return conn
+				},
+			), EvTCP, EvTCPConnAdded)
 		})
 	}
-	deleteConn := func(conn *Conn) {
+	deleteConn := func(conn *TCPConn) {
 		doInLoop(func() {
 			// delete conn from conns
 			for i := 0; i < len(conns); {
 				if conns[i] == conn {
 					conns = append(conns[:i], conns[i+1:]...)
+					trigger(scope.Sub(
+						func() *TCPConn {
+							return conn
+						},
+					), EvTCP, EvTCPConnDeleted)
 					continue
 				}
 				i++
@@ -78,7 +91,7 @@ func startTCP(
 		})
 	}
 
-	readConn := func(conn *Conn) {
+	readConn := func(conn *TCPConn) {
 		inboundSenderGroup.Add(1)
 		defer inboundSenderGroup.Done()
 
@@ -96,6 +109,11 @@ func startTCP(
 			inbound, err := network.readInbound(conn)
 
 			if err != nil {
+				trigger(scope.Sub(
+					func() (*TCPConn, error) {
+						return conn, err
+					},
+				), EvTCP, EvTCPReadInboundError)
 				conn.Close()
 				select {
 				case <-closing:
@@ -110,30 +128,61 @@ func startTCP(
 				conn.RUnlock()
 				parser.DecodeLayers(inbound.Eth, &decoded)
 				for _, t := range decoded {
+				s:
 					switch t {
 
 					case layers.LayerTypeEthernet:
 						if !bytes.Equal(eth.SrcMAC, EthernetBroadcast) {
 							addr := make(net.HardwareAddr, len(eth.SrcMAC))
 							copy(addr, eth.SrcMAC)
+							for _, a := range conn.Addrs {
+								if bytes.Equal(a, addr) {
+									break s
+								}
+							}
 							conn.Lock()
 							conn.Addrs = append(conn.Addrs, addr)
 							conn.Unlock()
+							trigger(scope.Sub(
+								func() (*TCPConn, net.HardwareAddr) {
+									return conn, addr
+								},
+							), EvTCP, EvTCPConnGotAddr)
 						}
 
 					case layers.LayerTypeARP:
 						ip := make(net.IP, len(arp.SourceProtAddress))
 						copy(ip, arp.SourceProtAddress)
+						for _, i := range conn.IPs {
+							if i.Equal(ip) {
+								break s
+							}
+						}
 						conn.Lock()
 						conn.IPs = append(conn.IPs, ip)
 						conn.Unlock()
+						trigger(scope.Sub(
+							func() (*TCPConn, net.IP) {
+								return conn, ip
+							},
+						), EvTCP, EvTCPConnGotIP)
 
 					case layers.LayerTypeIPv4:
 						ip := make(net.IP, len(ipv4.SrcIP))
 						copy(ip, ipv4.SrcIP)
+						for _, i := range conn.IPs {
+							if i.Equal(ip) {
+								break s
+							}
+						}
 						conn.Lock()
 						conn.IPs = append(conn.IPs, ip)
 						conn.Unlock()
+						trigger(scope.Sub(
+							func() (*TCPConn, net.IP) {
+								return conn, ip
+							},
+						), EvTCP, EvTCPConnGotIP)
 
 					}
 				}
@@ -143,6 +192,11 @@ func startTCP(
 
 			select {
 			case inboundCh <- &inbound:
+				trigger(scope.Sub(
+					func() (*TCPConn, *Inbound) {
+						return conn, &inbound
+					},
+				), EvTCP, EvTCPInboundSent)
 			case <-closing:
 			}
 
@@ -179,6 +233,15 @@ func startTCP(
 				if err != nil {
 					continue
 				}
+				listener := &TCPListener{
+					Listener:  ln,
+					StartedAt: getTime(),
+				}
+				trigger(scope.Sub(
+					func() *TCPListener {
+						return listener
+					},
+				), EvTCP, EvTCPListened)
 
 				spawn(scope, func() {
 					for {
@@ -186,10 +249,15 @@ func startTCP(
 						if err != nil {
 							return
 						}
+						trigger(scope.Sub(
+							func() (*TCPListener, net.Conn) {
+								return listener, netConn
+							},
+						), EvTCP, EvTCPAccepted)
 
 						spawn(scope, func() {
 							netConn.SetDeadline(getTime().Add(connDuration))
-							conn := &Conn{
+							conn := &TCPConn{
 								Conn: netConn,
 							}
 							addConn(conn)
@@ -199,10 +267,7 @@ func startTCP(
 					}
 				})
 
-				listeners[hostPort] = &Listener{
-					Listener:  ln,
-					StartedAt: getTime(),
-				}
+				listeners[hostPort] = listener
 
 			} else if node.WanHost != "" {
 				// non-local node
@@ -226,8 +291,13 @@ func startTCP(
 					if err != nil {
 						return
 					}
+					trigger(scope.Sub(
+						func() (*Node, net.Conn) {
+							return node, netConn
+						},
+					), EvTCP, EvTCPDialed)
 					netConn.SetDeadline(getTime().Add(connDuration))
-					conn := &Conn{
+					conn := &TCPConn{
 						Conn: netConn,
 						IPs: []net.IP{
 							node.LanIP,
@@ -241,6 +311,7 @@ func startTCP(
 
 		}
 
+		trigger(scope, EvTCPRefreshed)
 	}
 	refreshConns()
 
@@ -302,10 +373,21 @@ func startTCP(
 
 				// send
 				if err := network.writeOutbound(conn, outbound); err != nil {
+					trigger(scope.Sub(
+						func() (*TCPConn, *Outbound, error) {
+							return conn, outbound, err
+						},
+					), EvTCP, EvTCPWriteOutboundError)
 					deleteConn(conn)
 					continue
 				}
 				sent = true
+
+				trigger(scope.Sub(
+					func() (*TCPConn, *Outbound) {
+						return conn, outbound
+					},
+				), EvTCP, EvTCPOutboundSent)
 
 				if ipMatched || addrMatched {
 					break
@@ -314,10 +396,11 @@ func startTCP(
 			}
 
 			if !sent {
-				//pt("--- not sent ---\n")
-				//pt("serial %d\n", outbound.Serial)
-				//dumpEth(outbound.Eth.Bytes)
-				//pt("conns %v\n", conns[outbound.DestNode])
+				trigger(scope.Sub(
+					func() (*Outbound, []*TCPConn) {
+						return outbound, conns
+					},
+				), EvTCP, EvTCPOutboundNotSent)
 			}
 
 		case <-refreshConnsTicker.C:
@@ -329,6 +412,11 @@ func startTCP(
 				if now.Sub(listener.StartedAt) > listenerDuration {
 					listener.Listener.Close()
 					delete(listeners, addr)
+					trigger(scope.Sub(
+						func() *TCPListener {
+							return listener
+						},
+					), EvTCP, EvTCPListenerClosed)
 				}
 			}
 
@@ -342,6 +430,7 @@ func startTCP(
 			for _, conn := range conns {
 				conn.SetDeadline(getTime().Add(-time.Hour))
 			}
+			trigger(scope, EvTCP, EvTCPClosed)
 			return
 
 		}
