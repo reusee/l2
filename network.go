@@ -48,7 +48,7 @@ var (
 	EthernetBroadcast = net.HardwareAddr{0xff, 0xff, 0xff, 0xff, 0xff, 0xff}
 )
 
-func (n *Network) Start() (err error) {
+func (n *Network) Start(fns ...dyn) (err error) {
 	defer he(&err)
 
 	// get local node
@@ -186,6 +186,10 @@ func (n *Network) Start() (err error) {
 	var on On
 	var trigger Trigger
 	scope.Assign(&on, &trigger)
+
+	for _, fn := range fns {
+		scope.Call(fn)
+	}
 
 	var outboundChans []chan *Outbound
 	inboundChan := make(chan *Inbound, 1024)
