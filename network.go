@@ -38,10 +38,11 @@ type Network struct {
 }
 
 type (
-	Hostname string
-	Spawn    func(Scope, any)
-	Closing  chan struct{}
-	Ready    chan struct{}
+	Hostname    string
+	Spawn       func(Scope, any)
+	Closing     chan struct{}
+	Ready       chan struct{}
+	BridgeIndex uint8
 )
 
 var (
@@ -196,7 +197,8 @@ func (n *Network) Start(fns ...dyn) (err error) {
 
 	// start bridges
 	inboundSenderGroup := new(sync.WaitGroup)
-	for _, name := range localNode.BridgeNames {
+	for i, name := range localNode.BridgeNames {
+		i := i
 		bridge, ok := availableBridges[name]
 		if !ok {
 			ce(me(nil, "no such bridge: %s", name))
@@ -216,6 +218,9 @@ func (n *Network) Start(fns ...dyn) (err error) {
 			},
 			func() *sync.WaitGroup {
 				return inboundSenderGroup
+			},
+			func() BridgeIndex {
+				return BridgeIndex(i)
 			},
 		), bridge.Start)
 		<-ready

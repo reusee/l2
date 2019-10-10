@@ -36,6 +36,7 @@ func startTCP(
 	inboundSenderGroup *sync.WaitGroup,
 	getTime func() time.Time,
 	trigger Trigger,
+	bridgeIndex BridgeIndex,
 ) {
 
 	// port
@@ -193,6 +194,7 @@ func startTCP(
 				conn.RUnlock()
 			}
 
+			inbound.BridgeIndex = uint8(bridgeIndex)
 			select {
 			case inboundCh <- &inbound:
 				trigger(scope.Sub(

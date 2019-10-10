@@ -42,6 +42,7 @@ func startUDP(
 	inboundCh chan *Inbound,
 	inboundSenderGroup *sync.WaitGroup,
 	trigger Trigger,
+	bridgeIndex BridgeIndex,
 ) {
 
 	portShiftInterval := time.Second * 5
@@ -304,6 +305,7 @@ func startUDP(
 				}
 			}
 
+			inbound.Inbound.BridgeIndex = uint8(bridgeIndex)
 			select {
 			case inboundCh <- inbound.Inbound:
 				trigger(scope.Sub(
