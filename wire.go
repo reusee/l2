@@ -28,8 +28,9 @@ const (
 )
 
 type Inbound struct {
-	Eth    []byte
-	Serial uint64
+	Eth      []byte
+	Serial   uint64
+	DestAddr *net.HardwareAddr
 }
 
 func (n *Network) writeOutbound(w io.Writer, outbound *Outbound) error {

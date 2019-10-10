@@ -227,9 +227,14 @@ func (n *Network) Start(fns ...dyn) (err error) {
 
 	outboundSenderGroup := new(sync.WaitGroup)
 	var ifaceDoChans []chan func()
+	var ifaceHardwareAddrs []net.HardwareAddr
 	for _, iface := range n.ifaces {
 		iface := iface
 		outboundSenderGroup.Add(1)
+
+		netInterface, err := net.InterfaceByName(iface.Name())
+		ce(err)
+		ifaceHardwareAddrs = append(ifaceHardwareAddrs, netInterface.HardwareAddr)
 
 		// interface -> bridge
 		spawn(scope, func() {
@@ -411,9 +416,12 @@ func (n *Network) Start(fns ...dyn) (err error) {
 				}
 
 				for i, ch := range ifaceDoChans {
-					i := i
+					if inbound.DestAddr != nil && !bytes.Equal(*inbound.DestAddr, ifaceHardwareAddrs[i]) {
+						continue
+					}
+					iface := n.ifaces[i]
 					ch <- func() {
-						n.ifaces[i].Write(inbound.Eth)
+						iface.Write(inbound.Eth)
 					}
 				}
 

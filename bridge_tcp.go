@@ -132,6 +132,9 @@ func startTCP(
 					switch t {
 
 					case layers.LayerTypeEthernet:
+						destAddr := make(net.HardwareAddr, len(eth.DstMAC))
+						copy(destAddr, eth.DstMAC)
+						inbound.DestAddr = &destAddr
 						if !bytes.Equal(eth.SrcMAC, EthernetBroadcast) {
 							addr := make(net.HardwareAddr, len(eth.SrcMAC))
 							copy(addr, eth.SrcMAC)
