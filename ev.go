@@ -4,6 +4,7 @@ import "sync"
 
 const (
 	EvTCP = iota + 1
+	EvTCPReady
 	EvTCPConnAdded
 	EvTCPConnDeleted
 	EvTCPReadInboundError
@@ -19,6 +20,22 @@ const (
 	EvTCPOutboundNotSent
 	EvTCPListenerClosed
 	EvTCPClosed
+
+	EvUDP
+	EvUDPReady
+	EvUDPRemoteAdded
+	EvUDPLocalAdded
+	EvUDPConnReadError
+	EvUDPReadInboundError
+	EvUDPLocalClosed
+	EvUDPRemoteClosed
+	EvUDPRemoteGotAddr
+	EvUDPRemoteGotIP
+	EvUDPInboundSent
+	EvUDPWriteOutboundError
+	EvUDPOutboundSent
+	EvUDPOutboundNotSent
+	EvUDPClosed
 )
 
 type (

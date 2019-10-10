@@ -11,6 +11,26 @@ import (
 	"github.com/google/gopacket/layers"
 )
 
+type UDPLocal struct {
+	Conn      *net.UDPConn
+	Port      int
+	StartedAt time.Time
+}
+
+type UDPRemote struct {
+	UDPAddr    *net.UDPAddr
+	UDPAddrStr string
+	AddedAt    time.Time
+	IPs        []net.IP
+	Addrs      []net.HardwareAddr
+}
+
+type UDPInbound struct {
+	RemoteAddr *net.UDPAddr
+	Inbound    *Inbound
+	LocalPort  int
+}
+
 func startUDP(
 	ready Ready,
 	scope Scope,
@@ -21,6 +41,7 @@ func startUDP(
 	getTime func() time.Time,
 	inboundCh chan *Inbound,
 	inboundSenderGroup *sync.WaitGroup,
+	trigger Trigger,
 ) {
 
 	portShiftInterval := time.Second * 5
@@ -32,22 +53,8 @@ func startUDP(
 		portShiftInterval,
 	)
 
-	type Local struct {
-		Conn      *net.UDPConn
-		Port      int
-		StartedAt time.Time
-	}
-
-	type Remote struct {
-		UDPAddr    *net.UDPAddr
-		UDPAddrStr string
-		AddedAt    time.Time
-		IPs        []net.IP
-		Addrs      []net.HardwareAddr
-	}
-
-	var remotes []*Remote
-	var locals []*Local
+	var remotes []*UDPRemote
+	var locals []*UDPLocal
 
 	updateRemotes := func() {
 	loop_nodes:
@@ -79,23 +86,24 @@ func startUDP(
 					continue loop_nodes
 				}
 			}
-			remotes = append(remotes, &Remote{
+			remote := &UDPRemote{
 				UDPAddr:    udpAddr,
 				UDPAddrStr: udpAddrStr,
 				AddedAt:    now,
 				IPs: []net.IP{
 					node.LanIP,
 				},
-			})
+			}
+			remotes = append(remotes, remote)
+			trigger(scope.Sub(
+				func() *UDPRemote {
+					return remote
+				},
+			), EvUDP, EvUDPRemoteAdded)
 		}
 	}
 	updateRemotes()
 
-	type UDPInbound struct {
-		RemoteAddr *net.UDPAddr
-		Inbound    *Inbound
-		LocalPort  int
-	}
 	inbounds := make(chan UDPInbound, 1024)
 
 	addLocal := func(port int) {
@@ -113,21 +121,37 @@ func startUDP(
 			return
 		}
 		now := getTime()
-		locals = append(locals, &Local{
+		local := &UDPLocal{
 			Conn:      conn,
 			Port:      port,
 			StartedAt: now,
-		})
+		}
+		locals = append(locals, local)
+		trigger(scope.Sub(
+			func() *UDPLocal {
+				return local
+			},
+		), EvUDP, EvUDPLocalAdded)
 
 		spawn(scope, func() {
 			bs := make([]byte, network.MTU*2)
 			for {
 				n, remoteAddr, err := conn.ReadFromUDP(bs)
 				if err != nil {
+					trigger(scope.Sub(
+						func() (*UDPLocal, error) {
+							return local, err
+						},
+					), EvUDP, EvUDPConnReadError)
 					return
 				}
 				inbound, err := network.readInbound(bytes.NewReader(bs[:n]))
 				if err != nil {
+					trigger(scope.Sub(
+						func() (*UDPLocal, error) {
+							return local, err
+						},
+					), EvUDP, EvUDPReadInboundError)
 					return
 				}
 				inbounds <- UDPInbound{
@@ -142,6 +166,7 @@ func startUDP(
 	addLocal(getPort(network.LocalNode, getTime().Add(time.Second)))
 
 	close(ready)
+	trigger(scope, EvUDP, EvUDPReady)
 
 	refreshConnsTicker := time.NewTicker(time.Second * 1)
 
@@ -168,6 +193,11 @@ func startUDP(
 				if now.Sub(local.StartedAt) > localConnDuration {
 					local.Conn.Close()
 					locals = append(locals[:i], locals[i+1:]...)
+					trigger(scope.Sub(
+						func() *UDPLocal {
+							return local
+						},
+					), EvUDP, EvUDPLocalClosed)
 					continue
 				}
 				i++
@@ -179,6 +209,11 @@ func startUDP(
 				remote := remotes[i]
 				if now.Sub(remote.AddedAt) > remoteDuration {
 					remotes = append(remotes[:i], remotes[i+1:]...)
+					trigger(scope.Sub(
+						func() *UDPRemote {
+							return remote
+						},
+					), EvUDP, EvUDPRemoteClosed)
 					continue
 				}
 				i++
@@ -188,7 +223,7 @@ func startUDP(
 			addrStr := inbound.RemoteAddr.String()
 			now := getTime()
 
-			var remote *Remote
+			var remote *UDPRemote
 			for _, r := range remotes {
 				if r.UDPAddrStr == addrStr {
 					remote = r
@@ -196,35 +231,71 @@ func startUDP(
 				}
 			}
 			if remote == nil {
-				remote = &Remote{
+				remote = &UDPRemote{
 					UDPAddr:    inbound.RemoteAddr,
 					UDPAddrStr: addrStr,
 					AddedAt:    now,
 				}
 				remotes = append(remotes, remote)
+				trigger(scope.Sub(
+					func() *UDPRemote {
+						return remote
+					},
+				), EvUDP, EvUDPRemoteAdded)
 			}
 
 			if len(remote.Addrs) == 0 || len(remote.IPs) == 0 {
 				parser.DecodeLayers(inbound.Inbound.Eth, &decoded)
 				for _, t := range decoded {
+				s:
 					switch t {
 
 					case layers.LayerTypeEthernet:
 						if !bytes.Equal(eth.SrcMAC, EthernetBroadcast) {
 							addr := make(net.HardwareAddr, len(eth.SrcMAC))
 							copy(addr, eth.SrcMAC)
+							for _, a := range remote.Addrs {
+								if bytes.Equal(a, addr) {
+									break s
+								}
+							}
 							remote.Addrs = append(remote.Addrs, addr)
+							trigger(scope.Sub(
+								func() (*UDPRemote, net.HardwareAddr) {
+									return remote, addr
+								},
+							), EvUDP, EvUDPRemoteGotAddr)
 						}
 
 					case layers.LayerTypeARP:
 						ip := make(net.IP, len(arp.SourceProtAddress))
 						copy(ip, arp.SourceProtAddress)
+						for _, i := range remote.IPs {
+							if i.Equal(ip) {
+								break s
+							}
+						}
 						remote.IPs = append(remote.IPs, ip)
+						trigger(scope.Sub(
+							func() (*UDPRemote, net.IP) {
+								return remote, ip
+							},
+						), EvUDP, EvUDPRemoteGotIP)
 
 					case layers.LayerTypeIPv4:
 						ip := make(net.IP, len(ipv4.SrcIP))
 						copy(ip, ipv4.SrcIP)
+						for _, i := range remote.IPs {
+							if i.Equal(ip) {
+								break s
+							}
+						}
 						remote.IPs = append(remote.IPs, ip)
+						trigger(scope.Sub(
+							func() (*UDPRemote, net.IP) {
+								return remote, ip
+							},
+						), EvUDP, EvUDPRemoteGotIP)
 
 					}
 				}
@@ -232,6 +303,11 @@ func startUDP(
 
 			select {
 			case inboundCh <- inbound.Inbound:
+				trigger(scope.Sub(
+					func() (UDPInbound, *Inbound) {
+						return inbound, inbound.Inbound
+					},
+				), EvUDP, EvUDPInboundSent)
 			case <-closing:
 			}
 
@@ -282,16 +358,31 @@ func startUDP(
 				}
 
 				// send
-				if len(locals) > 0 {
-					local := locals[len(locals)-1]
-					buf := new(bytes.Buffer)
-					ce(network.writeOutbound(buf, outbound))
+				buf := new(bytes.Buffer)
+				if err := network.writeOutbound(buf, outbound); err != nil {
+					panic(err)
+				}
+				var local *UDPLocal
+				for i := len(locals) - 1; i >= 0; i-- {
+					local = locals[i]
 					_, err := local.Conn.WriteToUDP(buf.Bytes(), remote.UDPAddr)
 					if err != nil {
+						trigger(scope.Sub(
+							func() (*UDPLocal, *Outbound, *UDPRemote) {
+								return local, outbound, remote
+							},
+						), EvUDP, EvUDPWriteOutboundError)
 						continue
 					}
 					sent = true
+					break
 				}
+
+				trigger(scope.Sub(
+					func() (*UDPLocal, *Outbound, *UDPRemote) {
+						return local, outbound, remote
+					},
+				), EvUDP, EvUDPOutboundSent)
 
 				if ipMatched || addrMatched {
 					break
@@ -300,15 +391,18 @@ func startUDP(
 			}
 
 			if !sent {
-				//pt("--- not sent ---\n")
-				//pt("serial %d\n", outbound.Serial)
-				//dumpEth(outbound.Eth)
+				trigger(scope.Sub(
+					func() (*Outbound, []*UDPRemote) {
+						return outbound, remotes
+					},
+				), EvUDP, EvUDPOutboundNotSent)
 			}
 
 		case <-closing:
 			for _, local := range locals {
 				local.Conn.Close()
 			}
+			trigger(scope, EvUDP, EvUDPClosed)
 			return
 
 		}

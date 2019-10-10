@@ -319,6 +319,7 @@ func startTCP(
 	listenerCheckTicker := time.NewTicker(time.Second * 5)
 
 	close(ready)
+	trigger(scope, EvTCP, EvTCPReady)
 
 	for {
 		select {
