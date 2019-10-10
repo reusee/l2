@@ -132,6 +132,8 @@ func (n *Network) Start(fns ...dyn) (err error) {
 		servers := []string{
 			"time.cloudflare.com",
 			"cn.ntp.org.cn",
+			"ntp6a.rollernet.us",
+			"time.google.com",
 		}
 		ret := make(chan time.Time, 1)
 		for _, server := range servers {
