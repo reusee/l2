@@ -328,6 +328,9 @@ func startUDP(
 				skip := false
 				ipMatched := false
 				addrMatched := false
+				if len(remote.Addrs) == 0 && len(remote.IPs) == 0 {
+					skip = true
+				}
 				if outbound.DestIP != nil && len(remote.IPs) > 0 {
 					ok := false
 					for _, ip := range remote.IPs {

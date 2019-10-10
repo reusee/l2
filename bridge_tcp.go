@@ -342,6 +342,9 @@ func startTCP(
 				ipMatched := false
 				addrMatched := false
 				conn.RLock()
+				if len(conn.Addrs) == 0 && len(conn.IPs) == 0 {
+					skip = true
+				}
 				if outbound.DestIP != nil && len(conn.IPs) > 0 {
 					ok := false
 					for _, ip := range conn.IPs {
