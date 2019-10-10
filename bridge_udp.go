@@ -3,7 +3,6 @@ package l2
 import (
 	"bytes"
 	"fmt"
-	"math/rand"
 	"net"
 	"sync"
 	"time"
@@ -324,7 +323,7 @@ func startUDP(
 
 			sent := false
 
-			for i := range rand.Perm(len(remotes)) {
+			for i := len(remotes) - 1; i >= 0; i-- {
 				remote := remotes[i]
 
 				// filter
