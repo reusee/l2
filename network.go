@@ -427,6 +427,11 @@ func (n *Network) Start(fns ...dyn) (err error) {
 					iface := n.ifaces[i]
 					ch <- func() {
 						iface.Write(inbound.Eth)
+						trigger(scope.Sub(
+							func() *Inbound {
+								return inbound
+							},
+						), EvNetwork, EvNetworkInboundWritten)
 					}
 					break
 				}

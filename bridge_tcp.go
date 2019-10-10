@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"math/rand"
 	"net"
 	"strconv"
 	"sync"
@@ -336,7 +337,7 @@ func startTCP(
 
 			sent := false
 
-			for i := len(conns) - 1; i >= 0; i-- {
+			for i := range rand.Perm(len(conns)) {
 				conn := conns[i]
 
 				// filter

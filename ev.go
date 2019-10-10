@@ -42,6 +42,7 @@ const (
 	EvNetworkOutboundSent
 	EvNetworkInboundReceived
 	EvNetworkInboundDuplicated
+	EvNetworkInboundWritten
 )
 
 type (
