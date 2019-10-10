@@ -423,6 +423,7 @@ func (n *Network) Start(fns ...dyn) (err error) {
 					ch <- func() {
 						iface.Write(inbound.Eth)
 					}
+					break
 				}
 
 			case bs := <-n.InjectFrame:
