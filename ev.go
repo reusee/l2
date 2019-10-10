@@ -36,6 +36,12 @@ const (
 	EvUDPOutboundSent
 	EvUDPOutboundNotSent
 	EvUDPClosed
+
+	EvNetwork
+	EvNetworkClosing
+	EvNetworkOutboundSent
+	EvNetworkInboundReceived
+	EvNetworkInboundDuplicated
 )
 
 type (

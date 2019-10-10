@@ -51,8 +51,12 @@ func testPingPong(
 			spawn Spawn,
 			scope Scope,
 		) {
-			network1.onClose = append(network1.onClose, func() {
-				ln.Close()
+			network1.Scope.Call(func(
+				on On,
+			) {
+				on(EvNetworkClosing, func() {
+					ln.Close()
+				})
 			})
 			spawn(scope, func() {
 				for {

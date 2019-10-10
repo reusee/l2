@@ -35,7 +35,6 @@ type Network struct {
 	closing   chan struct{}
 	waitClose sync.WaitGroup
 	closeOnce sync.Once
-	onClose   []func()
 }
 
 type (
@@ -184,6 +183,9 @@ func (n *Network) Start() (err error) {
 		Ev,
 	)
 	n.Scope = scope
+	var on On
+	var trigger Trigger
+	scope.Assign(&on, &trigger)
 
 	var outboundChans []chan *Outbound
 	inboundChan := make(chan *Inbound, 1024)
@@ -215,7 +217,7 @@ func (n *Network) Start() (err error) {
 		<-ready
 	}
 
-	n.onClose = append(n.onClose, func() {
+	on(EvNetworkClosing, func() {
 		inboundSenderGroup.Wait()
 	})
 
@@ -299,17 +301,23 @@ func (n *Network) Start() (err error) {
 				sn := atomic.AddUint64(&serial, 1)
 				eth := make([]byte, l)
 				copy(eth, bs)
+				outbound := &Outbound{
+					Eth:      eth,
+					Serial:   sn,
+					DestIP:   destIP,
+					DestAddr: destAddr,
+				}
 				for _, ch := range outboundChans {
 					select {
-					case ch <- &Outbound{
-						Eth:      eth,
-						Serial:   sn,
-						DestIP:   destIP,
-						DestAddr: destAddr,
-					}:
+					case ch <- outbound:
 					case <-closing:
 					}
 				}
+				trigger(scope.Sub(
+					func() *Outbound {
+						return outbound
+					},
+				), EvNetwork, EvNetworkOutboundSent)
 
 			}
 		})
@@ -331,7 +339,7 @@ func (n *Network) Start() (err error) {
 		})
 
 	}
-	n.onClose = append(n.onClose, func() {
+	on(EvNetworkClosing, func() {
 		for _, iface := range n.ifaces {
 			iface.Close()
 		}
@@ -366,6 +374,12 @@ func (n *Network) Start() (err error) {
 					break
 				}
 
+				trigger(scope.Sub(
+					func() *Inbound {
+						return inbound
+					},
+				), EvNetwork, EvNetworkInboundReceived)
+
 				parser.DecodeLayers(inbound.Eth, &decoded)
 
 				for _, t := range decoded {
@@ -380,6 +394,11 @@ func (n *Network) Start() (err error) {
 							dedup[macInt] = m
 						}
 						if m[inbound.Serial%(1<<17)] == inbound.Serial {
+							trigger(scope.Sub(
+								func() *Inbound {
+									return inbound
+								},
+							), EvNetwork, EvNetworkInboundDuplicated)
 							continue loop_inbound
 						}
 						m[inbound.Serial%(1<<17)] = inbound.Serial
@@ -410,9 +429,11 @@ func (n *Network) Start() (err error) {
 func (n *Network) Close() {
 	n.closeOnce.Do(func() {
 		close(n.closing)
-		for _, fn := range n.onClose {
-			fn()
-		}
+		n.Scope.Call(func(
+			trigger Trigger,
+		) {
+			trigger(n.Scope, EvNetworkClosing)
+		})
 		n.waitClose.Wait()
 	})
 }
