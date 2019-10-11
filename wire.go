@@ -5,17 +5,22 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"encoding/binary"
+	"encoding/gob"
 	"fmt"
 	"io"
 	"math/rand"
 	"net"
 )
 
+type WireData struct {
+	Eth    []byte
+	Serial uint64
+}
+
 type Outbound struct {
-	Eth          []byte
+	WireData
 	DestIP       *net.IP
 	DestAddr     *net.HardwareAddr
-	Serial       uint64
 	PreferFormat WireFormat
 }
 
@@ -28,27 +33,14 @@ const (
 )
 
 type Inbound struct {
-	Eth         []byte
-	Serial      uint64
+	WireData
 	DestAddr    *net.HardwareAddr
 	BridgeIndex uint8
 }
 
 func (n *Network) writeOutbound(w io.Writer, outbound *Outbound) error {
-	plaintextBS := make([]byte,
-		2+ // payload len
-			len(outbound.Eth)+ // payload
-			8, // serial
-	)
-	buf := bytes.NewBuffer(plaintextBS[:0])
-	if err := binary.Write(buf, binary.LittleEndian, uint16(len(outbound.Eth))); err != nil {
-		return err
-	}
-	_, err := buf.Write(outbound.Eth)
-	if err != nil {
-		return err
-	}
-	if err := binary.Write(buf, binary.LittleEndian, outbound.Serial); err != nil {
+	buf := new(bytes.Buffer)
+	if err := gob.NewEncoder(buf).Encode(outbound.WireData); err != nil {
 		return err
 	}
 	plaintext := buf.Bytes()
@@ -134,17 +126,8 @@ func (n *Network) readInbound(r io.Reader) (inbound *Inbound, err error) {
 
 	}
 
-	r = bytes.NewReader(plaintext)
-	if err = binary.Read(r, binary.LittleEndian, &l); err != nil {
-		return
-	}
-	bs := make([]byte, int(l))
-	if _, err = io.ReadFull(r, bs); err != nil {
-		return
-	}
-	inbound = new(Inbound)
-	inbound.Eth = bs
-	if err = binary.Read(r, binary.LittleEndian, &inbound.Serial); err != nil {
+	if err = gob.NewDecoder(bytes.NewReader(plaintext)).Decode(&inbound); err != nil {
+		pt("%v\n", err)
 		return
 	}
 	return

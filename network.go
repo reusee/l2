@@ -309,8 +309,10 @@ func (n *Network) Start(fns ...dyn) (err error) {
 				eth := make([]byte, l)
 				copy(eth, bs)
 				outbound := &Outbound{
-					Eth:      eth,
-					Serial:   sn,
+					WireData: WireData{
+						Eth:    eth,
+						Serial: sn,
+					},
 					DestIP:   destIP,
 					DestAddr: destAddr,
 				}
