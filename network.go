@@ -385,6 +385,10 @@ func (n *Network) Start(fns ...dyn) (err error) {
 					&inbound,
 				), EvNetwork, EvNetworkInboundReceived)
 
+				if len(inbound.Eth) == 0 {
+					break
+				}
+
 				parser.DecodeLayers(inbound.Eth, &decoded)
 
 				for _, t := range decoded {

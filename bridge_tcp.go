@@ -21,7 +21,7 @@ type TCPListener struct {
 
 type TCPConn struct {
 	sync.RWMutex
-	net.Conn
+	*net.TCPConn
 	IPs   []net.IP
 	Addrs []net.HardwareAddr
 }
@@ -67,6 +67,15 @@ func startTCP(
 	// conn funcs
 	addConn := func(conn *TCPConn) {
 		doInLoop(func() {
+			// greeting packet
+			if err := network.writeOutbound(conn, &Outbound{
+				WireData: WireData{
+					IP: &network.LocalNode.LanIP,
+				},
+			}); err != nil {
+				conn.CloseWrite()
+				return
+			}
 			conns = append(conns, conn)
 			trigger(scope.Sub(
 				&conn,
@@ -110,7 +119,7 @@ func startTCP(
 				trigger(scope.Sub(
 					&conn, &err,
 				), EvTCP, EvTCPReadInboundError)
-				conn.Close()
+				conn.CloseRead()
 				select {
 				case <-closing:
 				default:
@@ -120,7 +129,14 @@ func startTCP(
 			}
 
 			conn.RLock()
-			if len(conn.Addrs) == 0 || len(conn.IPs) == 0 {
+			if inbound.IP != nil {
+				conn.RUnlock()
+				conn.Lock()
+				conn.IPs = append(conn.IPs, *inbound.IP)
+				conn.Unlock()
+				conn.RLock()
+			}
+			if (len(conn.Addrs) == 0 || len(conn.IPs) == 0) && len(inbound.Eth) > 0 {
 				conn.RUnlock()
 				parser.DecodeLayers(inbound.Eth, &decoded)
 				for _, t := range decoded {
@@ -246,7 +262,7 @@ func startTCP(
 						spawn(scope, func() {
 							netConn.SetDeadline(getTime().Add(connDuration))
 							conn := &TCPConn{
-								Conn: netConn,
+								TCPConn: netConn.(*net.TCPConn),
 							}
 							addConn(conn)
 							readConn(conn)
@@ -284,7 +300,7 @@ func startTCP(
 					), EvTCP, EvTCPDialed)
 					netConn.SetDeadline(getTime().Add(connDuration))
 					conn := &TCPConn{
-						Conn: netConn,
+						TCPConn: netConn.(*net.TCPConn),
 						IPs: []net.IP{
 							node.LanIP,
 						},
@@ -363,6 +379,7 @@ func startTCP(
 
 				// send
 				if err := network.writeOutbound(conn, outbound); err != nil {
+					conn.CloseWrite()
 					trigger(scope.Sub(
 						&conn, &outbound, &err,
 					), EvTCP, EvTCPWriteOutboundError)

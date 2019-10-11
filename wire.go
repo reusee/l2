@@ -15,6 +15,7 @@ import (
 type WireData struct {
 	Eth    []byte
 	Serial uint64
+	IP     *net.IP
 }
 
 type Outbound struct {
@@ -127,7 +128,6 @@ func (n *Network) readInbound(r io.Reader) (inbound *Inbound, err error) {
 	}
 
 	if err = gob.NewDecoder(bytes.NewReader(plaintext)).Decode(&inbound); err != nil {
-		pt("%v\n", err)
 		return
 	}
 	return
