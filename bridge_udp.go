@@ -74,6 +74,9 @@ func startUDP(
 				// non remote
 				continue
 			}
+			if node.WanHost == "" {
+				continue
+			}
 			node := node
 			now := getTime()
 			remotePort := getPort(node, now)
