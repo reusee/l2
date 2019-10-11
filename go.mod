@@ -5,7 +5,7 @@ go 1.13
 require (
 	github.com/beevik/ntp v0.2.0
 	github.com/google/gopacket v1.1.18-0.20190926102631-33810c487ced
-	github.com/reusee/dscope v0.0.0-20190907053525-42cbb6fc78f8
+	github.com/reusee/dscope v0.0.0-20191011031537-621f80b82680
 	github.com/reusee/e/v2 v2.3.3
 	github.com/songgao/water v0.0.0-20190725173103-fd331bda3f4b
 	github.com/vishvananda/netlink v1.0.0

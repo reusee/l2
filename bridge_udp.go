@@ -97,9 +97,7 @@ func startUDP(
 			}
 			remotes = append(remotes, remote)
 			trigger(scope.Sub(
-				func() *UDPRemote {
-					return remote
-				},
+				&remote,
 			), EvUDP, EvUDPRemoteAdded)
 		}
 	}
@@ -129,9 +127,7 @@ func startUDP(
 		}
 		locals = append(locals, local)
 		trigger(scope.Sub(
-			func() *UDPLocal {
-				return local
-			},
+			&local,
 		), EvUDP, EvUDPLocalAdded)
 
 		spawn(scope, func() {
@@ -140,24 +136,20 @@ func startUDP(
 				n, remoteAddr, err := conn.ReadFromUDP(bs)
 				if err != nil {
 					trigger(scope.Sub(
-						func() (*UDPLocal, error) {
-							return local, err
-						},
+						&local, &err,
 					), EvUDP, EvUDPConnReadError)
 					return
 				}
 				inbound, err := network.readInbound(bytes.NewReader(bs[:n]))
 				if err != nil {
 					trigger(scope.Sub(
-						func() (*UDPLocal, error) {
-							return local, err
-						},
+						&local, &err,
 					), EvUDP, EvUDPReadInboundError)
 					return
 				}
 				inbounds <- UDPInbound{
 					RemoteAddr: remoteAddr,
-					Inbound:    &inbound,
+					Inbound:    inbound,
 					LocalPort:  port,
 				}
 			}
@@ -195,9 +187,7 @@ func startUDP(
 					local.Conn.Close()
 					locals = append(locals[:i], locals[i+1:]...)
 					trigger(scope.Sub(
-						func() *UDPLocal {
-							return local
-						},
+						&local,
 					), EvUDP, EvUDPLocalClosed)
 					continue
 				}
@@ -211,9 +201,7 @@ func startUDP(
 				if now.Sub(remote.AddedAt) > remoteDuration {
 					remotes = append(remotes[:i], remotes[i+1:]...)
 					trigger(scope.Sub(
-						func() *UDPRemote {
-							return remote
-						},
+						&remote,
 					), EvUDP, EvUDPRemoteClosed)
 					continue
 				}
@@ -239,9 +227,7 @@ func startUDP(
 				}
 				remotes = append(remotes, remote)
 				trigger(scope.Sub(
-					func() *UDPRemote {
-						return remote
-					},
+					&remote,
 				), EvUDP, EvUDPRemoteAdded)
 			}
 
@@ -265,9 +251,7 @@ func startUDP(
 							}
 							remote.Addrs = append(remote.Addrs, addr)
 							trigger(scope.Sub(
-								func() (*UDPRemote, net.HardwareAddr) {
-									return remote, addr
-								},
+								&remote, &addr,
 							), EvUDP, EvUDPRemoteGotAddr)
 						}
 
@@ -281,9 +265,7 @@ func startUDP(
 						}
 						remote.IPs = append(remote.IPs, ip)
 						trigger(scope.Sub(
-							func() (*UDPRemote, net.IP) {
-								return remote, ip
-							},
+							&remote, &ip,
 						), EvUDP, EvUDPRemoteGotIP)
 
 					case layers.LayerTypeIPv4:
@@ -296,9 +278,7 @@ func startUDP(
 						}
 						remote.IPs = append(remote.IPs, ip)
 						trigger(scope.Sub(
-							func() (*UDPRemote, net.IP) {
-								return remote, ip
-							},
+							&remote, &ip,
 						), EvUDP, EvUDPRemoteGotIP)
 
 					}
@@ -309,9 +289,7 @@ func startUDP(
 			select {
 			case inboundCh <- inbound.Inbound:
 				trigger(scope.Sub(
-					func() (UDPInbound, *Inbound) {
-						return inbound, inbound.Inbound
-					},
+					&inbound, &inbound.Inbound,
 				), EvUDP, EvUDPInboundSent)
 			case <-closing:
 			}
@@ -376,9 +354,7 @@ func startUDP(
 					_, err := local.Conn.WriteToUDP(buf.Bytes(), remote.UDPAddr)
 					if err != nil {
 						trigger(scope.Sub(
-							func() (*UDPLocal, *Outbound, *UDPRemote) {
-								return local, outbound, remote
-							},
+							&local, &outbound, &remote,
 						), EvUDP, EvUDPWriteOutboundError)
 						continue
 					}
@@ -387,9 +363,7 @@ func startUDP(
 				}
 
 				trigger(scope.Sub(
-					func() (*UDPLocal, *Outbound, *UDPRemote) {
-						return local, outbound, remote
-					},
+					&local, &outbound, &remote,
 				), EvUDP, EvUDPOutboundSent)
 
 				if ipMatched || addrMatched {
@@ -400,9 +374,7 @@ func startUDP(
 
 			if !sent {
 				trigger(scope.Sub(
-					func() (*Outbound, []*UDPRemote) {
-						return outbound, remotes
-					},
+					&outbound, &remotes,
 				), EvUDP, EvUDPOutboundNotSent)
 			}
 

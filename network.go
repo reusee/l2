@@ -207,23 +207,14 @@ func (n *Network) Start(fns ...dyn) (err error) {
 		}
 		outboundCh := make(chan *Outbound, 1024)
 		outboundChans = append(outboundChans, outboundCh)
-		ready := make(chan struct{})
+		ready := Ready(make(chan struct{}))
+		bridgeIndex := BridgeIndex(i)
 		spawn(scope.Sub(
-			func() chan *Outbound {
-				return outboundCh
-			},
-			func() chan *Inbound {
-				return inboundChan
-			},
-			func() Ready {
-				return ready
-			},
-			func() *sync.WaitGroup {
-				return inboundSenderGroup
-			},
-			func() BridgeIndex {
-				return BridgeIndex(i)
-			},
+			&outboundCh,
+			&inboundChan,
+			&ready,
+			&inboundSenderGroup,
+			&bridgeIndex,
 		), bridge.Start)
 		<-ready
 	}
@@ -330,9 +321,7 @@ func (n *Network) Start(fns ...dyn) (err error) {
 					}
 				}
 				trigger(scope.Sub(
-					func() *Outbound {
-						return outbound
-					},
+					&outbound,
 				), EvNetwork, EvNetworkOutboundSent)
 
 			}
@@ -391,9 +380,7 @@ func (n *Network) Start(fns ...dyn) (err error) {
 				}
 
 				trigger(scope.Sub(
-					func() *Inbound {
-						return inbound
-					},
+					&inbound,
 				), EvNetwork, EvNetworkInboundReceived)
 
 				parser.DecodeLayers(inbound.Eth, &decoded)
@@ -411,9 +398,7 @@ func (n *Network) Start(fns ...dyn) (err error) {
 						}
 						if m[inbound.Serial%(1<<17)] == inbound.Serial {
 							trigger(scope.Sub(
-								func() *Inbound {
-									return inbound
-								},
+								&inbound,
 							), EvNetwork, EvNetworkInboundDuplicated)
 							continue loop_inbound
 						}
@@ -430,9 +415,7 @@ func (n *Network) Start(fns ...dyn) (err error) {
 					ch <- func() {
 						iface.Write(inbound.Eth)
 						trigger(scope.Sub(
-							func() *Inbound {
-								return inbound
-							},
+							&inbound,
 						), EvNetwork, EvNetworkInboundWritten)
 					}
 					break

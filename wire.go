@@ -96,7 +96,7 @@ func (n *Network) writeOutbound(w io.Writer, outbound *Outbound) error {
 
 var errBadFrame = fmt.Errorf("bad frame")
 
-func (n *Network) readInbound(r io.Reader) (inbound Inbound, err error) {
+func (n *Network) readInbound(r io.Reader) (inbound *Inbound, err error) {
 	var l uint16
 	if err = binary.Read(r, binary.LittleEndian, &l); err != nil {
 		return
@@ -142,6 +142,7 @@ func (n *Network) readInbound(r io.Reader) (inbound Inbound, err error) {
 	if _, err = io.ReadFull(r, bs); err != nil {
 		return
 	}
+	inbound = new(Inbound)
 	inbound.Eth = bs
 	if err = binary.Read(r, binary.LittleEndian, &inbound.Serial); err != nil {
 		return

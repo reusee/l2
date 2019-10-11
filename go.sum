@@ -9,6 +9,8 @@ github.com/google/gopacket v1.1.18-0.20190926102631-33810c487ced/go.mod h1:UdDNZ
 github.com/mdlayher/raw v0.0.0-20190606142536-fef19f00fc18/go.mod h1:7EpbotpCmVZcu+KCX4g9WaRNuu11uyhiW7+Le1dKawg=
 github.com/reusee/dscope v0.0.0-20190907053525-42cbb6fc78f8 h1:172tG8oMkvAMBxB4DUDna9aW0AbMKIV6HpnT4U0bowM=
 github.com/reusee/dscope v0.0.0-20190907053525-42cbb6fc78f8/go.mod h1:3YStua5Cdi2FJixYwigqIUYhARAZ8fQSTSNZ2ZotVA8=
+github.com/reusee/dscope v0.0.0-20191011031537-621f80b82680 h1:AE0mBKNHNgPyz11nWjxkLmqOCCWovVJtyiZ87wISEn4=
+github.com/reusee/dscope v0.0.0-20191011031537-621f80b82680/go.mod h1:3YStua5Cdi2FJixYwigqIUYhARAZ8fQSTSNZ2ZotVA8=
 github.com/reusee/e/v2 v2.3.3 h1:/voLHd60okWZ1KEaY4Pln877sbxYQJR2qj48bpWyI0I=
 github.com/reusee/e/v2 v2.3.3/go.mod h1:kykJjxDURd5MAGzB+xkwN7WxfuZaotLjTssHtjpi5LQ=
 github.com/songgao/water v0.0.0-20190725173103-fd331bda3f4b h1:+y4hCMc/WKsDbAPsOQZgBSaSZ26uh2afyaWeVg/3s/c=

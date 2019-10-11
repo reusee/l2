@@ -69,9 +69,7 @@ func startTCP(
 		doInLoop(func() {
 			conns = append(conns, conn)
 			trigger(scope.Sub(
-				func() *TCPConn {
-					return conn
-				},
+				&conn,
 			), EvTCP, EvTCPConnAdded)
 		})
 	}
@@ -82,9 +80,7 @@ func startTCP(
 				if conns[i] == conn {
 					conns = append(conns[:i], conns[i+1:]...)
 					trigger(scope.Sub(
-						func() *TCPConn {
-							return conn
-						},
+						&conn,
 					), EvTCP, EvTCPConnDeleted)
 					continue
 				}
@@ -112,9 +108,7 @@ func startTCP(
 
 			if err != nil {
 				trigger(scope.Sub(
-					func() (*TCPConn, error) {
-						return conn, err
-					},
+					&conn, &err,
 				), EvTCP, EvTCPReadInboundError)
 				conn.Close()
 				select {
@@ -149,9 +143,7 @@ func startTCP(
 							conn.Addrs = append(conn.Addrs, addr)
 							conn.Unlock()
 							trigger(scope.Sub(
-								func() (*TCPConn, net.HardwareAddr) {
-									return conn, addr
-								},
+								&conn, &addr,
 							), EvTCP, EvTCPConnGotAddr)
 						}
 
@@ -167,9 +159,7 @@ func startTCP(
 						conn.IPs = append(conn.IPs, ip)
 						conn.Unlock()
 						trigger(scope.Sub(
-							func() (*TCPConn, net.IP) {
-								return conn, ip
-							},
+							&conn, &ip,
 						), EvTCP, EvTCPConnGotIP)
 
 					case layers.LayerTypeIPv4:
@@ -184,9 +174,7 @@ func startTCP(
 						conn.IPs = append(conn.IPs, ip)
 						conn.Unlock()
 						trigger(scope.Sub(
-							func() (*TCPConn, net.IP) {
-								return conn, ip
-							},
+							&conn, &ip,
 						), EvTCP, EvTCPConnGotIP)
 
 					}
@@ -197,11 +185,9 @@ func startTCP(
 
 			inbound.BridgeIndex = uint8(bridgeIndex)
 			select {
-			case inboundCh <- &inbound:
+			case inboundCh <- inbound:
 				trigger(scope.Sub(
-					func() (*TCPConn, *Inbound) {
-						return conn, &inbound
-					},
+					&conn, &inbound,
 				), EvTCP, EvTCPInboundSent)
 			case <-closing:
 			}
@@ -244,9 +230,7 @@ func startTCP(
 					StartedAt: getTime(),
 				}
 				trigger(scope.Sub(
-					func() *TCPListener {
-						return listener
-					},
+					&listener,
 				), EvTCP, EvTCPListened)
 
 				spawn(scope, func() {
@@ -256,9 +240,7 @@ func startTCP(
 							return
 						}
 						trigger(scope.Sub(
-							func() (*TCPListener, net.Conn) {
-								return listener, netConn
-							},
+							&listener, &netConn,
 						), EvTCP, EvTCPAccepted)
 
 						spawn(scope, func() {
@@ -298,9 +280,7 @@ func startTCP(
 						return
 					}
 					trigger(scope.Sub(
-						func() (*Node, net.Conn) {
-							return node, netConn
-						},
+						&node, &netConn,
 					), EvTCP, EvTCPDialed)
 					netConn.SetDeadline(getTime().Add(connDuration))
 					conn := &TCPConn{
@@ -384,9 +364,7 @@ func startTCP(
 				// send
 				if err := network.writeOutbound(conn, outbound); err != nil {
 					trigger(scope.Sub(
-						func() (*TCPConn, *Outbound, error) {
-							return conn, outbound, err
-						},
+						&conn, &outbound, &err,
 					), EvTCP, EvTCPWriteOutboundError)
 					deleteConn(conn)
 					continue
@@ -394,9 +372,7 @@ func startTCP(
 				sent = true
 
 				trigger(scope.Sub(
-					func() (*TCPConn, *Outbound) {
-						return conn, outbound
-					},
+					&conn, &outbound,
 				), EvTCP, EvTCPOutboundSent)
 
 				if ipMatched || addrMatched {
@@ -407,9 +383,7 @@ func startTCP(
 
 			if !sent {
 				trigger(scope.Sub(
-					func() (*Outbound, []*TCPConn) {
-						return outbound, conns
-					},
+					&outbound, &conns,
 				), EvTCP, EvTCPOutboundNotSent)
 			}
 
@@ -423,9 +397,7 @@ func startTCP(
 					listener.Listener.Close()
 					delete(listeners, addr)
 					trigger(scope.Sub(
-						func() *TCPListener {
-							return listener
-						},
+						&listener,
 					), EvTCP, EvTCPListenerClosed)
 				}
 			}
