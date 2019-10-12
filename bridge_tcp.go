@@ -69,20 +69,26 @@ func startTCP(
 		doInLoop(func() {
 			// arp announcement
 			for _, addr := range ifaceAddrs {
-				ann := layers.ARP{
-					AddrType:          layers.LinkTypeEthernet,
-					Protocol:          layers.EthernetTypeARP,
-					HwAddressSize:     6,
-					ProtAddressSize:   4,
-					Operation:         2,
-					SourceHwAddress:   addr,
-					SourceProtAddress: network.LocalNode.LanIP,
-					DstHwAddress:      addr,
-					DstProtAddress:    network.LocalNode.LanIP,
-				}
 				buf := gopacket.NewSerializeBuffer()
-				opts := gopacket.SerializeOptions{} // See SerializeOptions for more details.
-				ce(ann.SerializeTo(buf, opts))
+				opts := gopacket.SerializeOptions{}
+				ce(gopacket.SerializeLayers(buf, opts,
+					&layers.Ethernet{
+						SrcMAC:       addr,
+						DstMAC:       net.HardwareAddr{0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
+						EthernetType: layers.EthernetTypeARP,
+					},
+					&layers.ARP{
+						AddrType:          layers.LinkTypeEthernet,
+						Protocol:          layers.EthernetTypeARP,
+						HwAddressSize:     6,
+						ProtAddressSize:   4,
+						Operation:         2,
+						SourceHwAddress:   addr,
+						SourceProtAddress: network.LocalNode.LanIP,
+						DstHwAddress:      addr,
+						DstProtAddress:    network.LocalNode.LanIP,
+					},
+				))
 				if err := network.writeOutbound(conn, &Outbound{
 					WireData: WireData{
 						Serial: 0,

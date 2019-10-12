@@ -417,20 +417,22 @@ func (n *Network) Start(fns ...dyn) (err error) {
 					switch t {
 
 					case layers.LayerTypeEthernet:
-						copy(macBytes, eth.SrcMAC)
-						macInt := binary.LittleEndian.Uint64(macBytes)
-						m, ok := dedup[macInt]
-						if !ok {
-							m = make([]uint64, 1<<17)
-							dedup[macInt] = m
+						if inbound.Serial > 0 {
+							copy(macBytes, eth.SrcMAC)
+							macInt := binary.LittleEndian.Uint64(macBytes)
+							m, ok := dedup[macInt]
+							if !ok {
+								m = make([]uint64, 1<<17)
+								dedup[macInt] = m
+							}
+							if m[inbound.Serial%(1<<17)] == inbound.Serial {
+								trigger(scope.Sub(
+									&inbound,
+								), EvNetwork, EvNetworkInboundDuplicated)
+								continue loop_inbound
+							}
+							m[inbound.Serial%(1<<17)] = inbound.Serial
 						}
-						if m[inbound.Serial%(1<<17)] == inbound.Serial {
-							trigger(scope.Sub(
-								&inbound,
-							), EvNetwork, EvNetworkInboundDuplicated)
-							continue loop_inbound
-						}
-						m[inbound.Serial%(1<<17)] = inbound.Serial
 
 					}
 				}
