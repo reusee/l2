@@ -40,7 +40,7 @@ func startTCP(
 ) {
 
 	// port
-	portShiftInterval := time.Second * 5
+	portShiftInterval := time.Millisecond * 5113
 	listenerDuration := portShiftInterval * 2
 	connDuration := portShiftInterval * 3
 	getPort := shiftingPort(

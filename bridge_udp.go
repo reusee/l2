@@ -45,7 +45,7 @@ func startUDP(
 	bridgeIndex BridgeIndex,
 ) {
 
-	portShiftInterval := time.Second * 5
+	portShiftInterval := time.Millisecond * 8311
 	localConnDuration := portShiftInterval * 2
 	remoteDuration := portShiftInterval * 3
 
