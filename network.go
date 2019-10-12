@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"net"
 	"os"
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -223,6 +224,21 @@ func (n *Network) Start(fns ...dyn) (err error) {
 		inboundSenderGroup.Wait()
 	})
 
+	// workers
+	jobs := make(chan func(), 1024)
+	for i := 0; i < runtime.NumCPU(); i++ {
+		spawn(scope, func() {
+			for {
+				select {
+				case <-closing:
+					return
+				case fn := <-jobs:
+					fn()
+				}
+			}
+		})
+	}
+
 	outboundSenderGroup := new(sync.WaitGroup)
 	var ifaceDoChans []chan func()
 	var ifaceHardwareAddrs []net.HardwareAddr
@@ -315,6 +331,9 @@ func (n *Network) Start(fns ...dyn) (err error) {
 					},
 					DestIP:   destIP,
 					DestAddr: destAddr,
+				}
+				jobs <- func() {
+					ce(outbound.encode(n.CryptoKey))
 				}
 				for _, ch := range outboundChans {
 					select {

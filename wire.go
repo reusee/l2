@@ -8,6 +8,7 @@ import (
 	"io"
 	"math/rand"
 	"net"
+	"sync"
 
 	"golang.org/x/crypto/chacha20poly1305"
 )
@@ -17,6 +18,10 @@ type Outbound struct {
 	DestIP       *net.IP
 	DestAddr     *net.HardwareAddr
 	PreferFormat WireFormat
+
+	encodeOnce sync.Once
+	encoded    []byte
+	err        error
 }
 
 type WireFormat byte
@@ -35,74 +40,84 @@ type Inbound struct {
 }
 
 func (n *Network) writeOutbound(w io.Writer, outbound *Outbound) (err error) {
-	plaintext, err := outbound.WireData.Marshal()
-	if err != nil {
+	if err = outbound.encode(n.CryptoKey); err != nil {
+		return
+	}
+	if err := binary.Write(w, binary.LittleEndian, uint16(len(outbound.encoded))); err != nil {
 		return err
 	}
-
-	var buf []byte
-	switch outbound.PreferFormat {
-
-	case FormatAESGCM:
-
-		block, err := aes.NewCipher(n.CryptoKey)
-		ce(err)
-		aead, err := cipher.NewGCM(block)
-		ce(err)
-		buf = make([]byte,
-			1+ // format
-				AESGCMNonceSize+ // nonce
-				len(plaintext)+ // plaintext
-				aead.Overhead(), // overhead
-		)
-		buf[0] = byte(FormatAESGCM)
-		nonce := buf[1 : 1+AESGCMNonceSize]
-		for i := 0; i+8 <= AESGCMNonceSize; i += 4 {
-			binary.LittleEndian.PutUint64(nonce[i:i+8], rand.Uint64())
-		}
-		ciphertext := aead.Seal(
-			buf[1+AESGCMNonceSize:1+AESGCMNonceSize],
-			nonce,
-			plaintext,
-			nil,
-		)
-		buf = buf[:1+AESGCMNonceSize+len(ciphertext)]
-
-	case FormatChacha20Poly1305:
-		aead, err := chacha20poly1305.NewX(n.CryptoKey)
-		ce(err)
-		buf = make([]byte,
-			1+
-				chacha20poly1305.NonceSizeX+
-				len(plaintext)+
-				aead.Overhead(),
-		)
-		// [1] FrameChacha20Poly1305
-		// [chacha20poly1305.NonceSizeX] nonce
-		// [v] ciphertext
-		buf[0] = byte(FormatChacha20Poly1305)
-		nonce := buf[1 : 1+chacha20poly1305.NonceSizeX]
-		for i := 0; i+8 <= chacha20poly1305.NonceSizeX; i += 4 {
-			binary.LittleEndian.PutUint64(nonce[i:i+8], rand.Uint64())
-		}
-		ciphertext := aead.Seal(
-			buf[1+chacha20poly1305.NonceSizeX:1+chacha20poly1305.NonceSizeX],
-			nonce,
-			plaintext,
-			nil,
-		)
-		buf = buf[:1+chacha20poly1305.NonceSizeX+len(ciphertext)]
-
-	}
-
-	if err := binary.Write(w, binary.LittleEndian, uint16(len(buf))); err != nil {
+	if _, err := w.Write(outbound.encoded); err != nil {
 		return err
 	}
-	if _, err := w.Write(buf); err != nil {
-		return err
-	}
-
 	return nil
+}
+
+func (outbound *Outbound) encode(key []byte) error {
+	outbound.encodeOnce.Do(func() {
+		plaintext, err := outbound.WireData.Marshal()
+		if err != nil {
+			outbound.err = err
+			return
+		}
+
+		var buf []byte
+		switch outbound.PreferFormat {
+
+		case FormatAESGCM:
+
+			block, err := aes.NewCipher(key)
+			ce(err)
+			aead, err := cipher.NewGCM(block)
+			ce(err)
+			buf = make([]byte,
+				1+ // format
+					AESGCMNonceSize+ // nonce
+					len(plaintext)+ // plaintext
+					aead.Overhead(), // overhead
+			)
+			buf[0] = byte(FormatAESGCM)
+			nonce := buf[1 : 1+AESGCMNonceSize]
+			for i := 0; i+8 <= AESGCMNonceSize; i += 4 {
+				binary.LittleEndian.PutUint64(nonce[i:i+8], rand.Uint64())
+			}
+			ciphertext := aead.Seal(
+				buf[1+AESGCMNonceSize:1+AESGCMNonceSize],
+				nonce,
+				plaintext,
+				nil,
+			)
+			buf = buf[:1+AESGCMNonceSize+len(ciphertext)]
+
+		case FormatChacha20Poly1305:
+			aead, err := chacha20poly1305.NewX(key)
+			ce(err)
+			buf = make([]byte,
+				1+
+					chacha20poly1305.NonceSizeX+
+					len(plaintext)+
+					aead.Overhead(),
+			)
+			// [1] FrameChacha20Poly1305
+			// [chacha20poly1305.NonceSizeX] nonce
+			// [v] ciphertext
+			buf[0] = byte(FormatChacha20Poly1305)
+			nonce := buf[1 : 1+chacha20poly1305.NonceSizeX]
+			for i := 0; i+8 <= chacha20poly1305.NonceSizeX; i += 4 {
+				binary.LittleEndian.PutUint64(nonce[i:i+8], rand.Uint64())
+			}
+			ciphertext := aead.Seal(
+				buf[1+chacha20poly1305.NonceSizeX:1+chacha20poly1305.NonceSizeX],
+				nonce,
+				plaintext,
+				nil,
+			)
+			buf = buf[:1+chacha20poly1305.NonceSizeX+len(ciphertext)]
+
+		}
+		outbound.encoded = buf
+	})
+
+	return outbound.err
 }
 
 var errBadFrame = fmt.Errorf("bad frame")
