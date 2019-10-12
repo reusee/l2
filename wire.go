@@ -53,10 +53,6 @@ func (n *Network) writeOutbound(w io.Writer, outbound *Outbound) error {
 		ce(err)
 		aead, err := cipher.NewGCM(block)
 		ce(err)
-		nonce := make([]byte, AESGCMNonceSize)
-		for i := 0; i+8 <= AESGCMNonceSize; i += 4 {
-			binary.LittleEndian.PutUint64(nonce[i:i+8], rand.Uint64())
-		}
 		buf := make([]byte,
 			1+ // format
 				AESGCMNonceSize+ // nonce
@@ -64,10 +60,10 @@ func (n *Network) writeOutbound(w io.Writer, outbound *Outbound) error {
 				aead.Overhead(), // overhead
 		)
 		buf[0] = byte(FormatAESGCM)
-		copy(
-			buf[1:1+AESGCMNonceSize],
-			nonce,
-		)
+		nonce := buf[1 : 1+AESGCMNonceSize]
+		for i := 0; i+8 <= AESGCMNonceSize; i += 4 {
+			binary.LittleEndian.PutUint64(nonce[i:i+8], rand.Uint64())
+		}
 		ciphertext := aead.Seal(
 			buf[1+AESGCMNonceSize:1+AESGCMNonceSize],
 			nonce,
