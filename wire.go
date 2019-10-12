@@ -8,6 +8,8 @@ import (
 	"io"
 	"math/rand"
 	"net"
+
+	"golang.org/x/crypto/chacha20poly1305"
 )
 
 type Outbound struct {
@@ -17,10 +19,11 @@ type Outbound struct {
 	PreferFormat WireFormat
 }
 
-type WireFormat uint8
+type WireFormat byte
 
 const (
-	FormatAESGCM WireFormat = iota
+	FormatChacha20Poly1305 WireFormat = iota
+	FormatAESGCM
 
 	AESGCMNonceSize = 12
 )
@@ -31,13 +34,13 @@ type Inbound struct {
 	BridgeIndex uint8
 }
 
-func (n *Network) writeOutbound(w io.Writer, outbound *Outbound) error {
+func (n *Network) writeOutbound(w io.Writer, outbound *Outbound) (err error) {
 	plaintext, err := outbound.WireData.Marshal()
 	if err != nil {
-		pt("%v\n", err)
 		return err
 	}
 
+	var buf []byte
 	switch outbound.PreferFormat {
 
 	case FormatAESGCM:
@@ -46,7 +49,7 @@ func (n *Network) writeOutbound(w io.Writer, outbound *Outbound) error {
 		ce(err)
 		aead, err := cipher.NewGCM(block)
 		ce(err)
-		buf := make([]byte,
+		buf = make([]byte,
 			1+ // format
 				AESGCMNonceSize+ // nonce
 				len(plaintext)+ // plaintext
@@ -64,13 +67,39 @@ func (n *Network) writeOutbound(w io.Writer, outbound *Outbound) error {
 			nil,
 		)
 		buf = buf[:1+AESGCMNonceSize+len(ciphertext)]
-		if err := binary.Write(w, binary.LittleEndian, uint16(len(buf))); err != nil {
-			return err
-		}
-		if _, err := w.Write(buf); err != nil {
-			return err
-		}
 
+	case FormatChacha20Poly1305:
+		aead, err := chacha20poly1305.NewX(n.CryptoKey)
+		ce(err)
+		buf = make([]byte,
+			1+
+				chacha20poly1305.NonceSizeX+
+				len(plaintext)+
+				aead.Overhead(),
+		)
+		// [1] FrameChacha20Poly1305
+		// [chacha20poly1305.NonceSizeX] nonce
+		// [v] ciphertext
+		buf[0] = byte(FormatChacha20Poly1305)
+		nonce := buf[1 : 1+chacha20poly1305.NonceSizeX]
+		for i := 0; i+8 <= chacha20poly1305.NonceSizeX; i += 4 {
+			binary.LittleEndian.PutUint64(nonce[i:i+8], rand.Uint64())
+		}
+		ciphertext := aead.Seal(
+			buf[1+chacha20poly1305.NonceSizeX:1+chacha20poly1305.NonceSizeX],
+			nonce,
+			plaintext,
+			nil,
+		)
+		buf = buf[:1+chacha20poly1305.NonceSizeX+len(ciphertext)]
+
+	}
+
+	if err := binary.Write(w, binary.LittleEndian, uint16(len(buf))); err != nil {
+		return err
+	}
+	if _, err := w.Write(buf); err != nil {
+		return err
 	}
 
 	return nil
@@ -114,11 +143,26 @@ func (n *Network) readInbound(r io.Reader) (inbound *Inbound, err error) {
 			return
 		}
 
+	case FormatChacha20Poly1305:
+		ciphertext = ciphertext[1:]
+		if len(ciphertext) < chacha20poly1305.NonceSizeX {
+			err = errBadFrame
+			return
+		}
+		nonce := ciphertext[:chacha20poly1305.NonceSizeX]
+		ciphertext = ciphertext[chacha20poly1305.NonceSizeX:]
+		aead, e := chacha20poly1305.NewX(n.CryptoKey)
+		ce(e)
+		plaintext, err = aead.Open(ciphertext[:0], nonce, ciphertext, nil)
+		if err != nil {
+			err = errBadFrame
+			return
+		}
+
 	}
 
 	inbound = new(Inbound)
 	if err = inbound.WireData.Unmarshal(plaintext); err != nil {
-		pt("%v\n", err)
 		return
 	}
 

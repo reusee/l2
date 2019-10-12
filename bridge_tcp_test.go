@@ -28,7 +28,7 @@ func TestPingPongAllInitNodesTCP(t *testing.T) {
 				},
 				InitNodes: nodes,
 				MTU:       1345,
-				CryptoKey: []byte("1234567890123456"),
+				CryptoKey: testCryptoKey,
 				SelectNode: func() *Node {
 					return node1
 				},
@@ -42,7 +42,7 @@ func TestPingPongAllInitNodesTCP(t *testing.T) {
 				},
 				InitNodes: nodes,
 				MTU:       1345,
-				CryptoKey: []byte("1234567890123456"),
+				CryptoKey: testCryptoKey,
 				SelectNode: func() *Node {
 					return node2
 				},
@@ -69,7 +69,7 @@ func TestPingPongOneRandomNodeTCP(t *testing.T) {
 				},
 				InitNodes: nodes,
 				MTU:       1345,
-				CryptoKey: []byte("1234567890123456"),
+				CryptoKey: testCryptoKey,
 				SelectNode: func() *Node {
 					return node1
 				},
@@ -83,7 +83,7 @@ func TestPingPongOneRandomNodeTCP(t *testing.T) {
 				},
 				InitNodes: nodes,
 				MTU:       1345,
-				CryptoKey: []byte("1234567890123456"),
+				CryptoKey: testCryptoKey,
 			}
 		},
 	)

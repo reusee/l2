@@ -34,7 +34,7 @@ func TestPingPongAllInitNodesUDP(t *testing.T) {
 				},
 				InitNodes: nodes,
 				MTU:       1345,
-				CryptoKey: []byte("1234567890123456"),
+				CryptoKey: testCryptoKey,
 				SelectNode: func() *Node {
 					return node1
 				},
@@ -48,7 +48,7 @@ func TestPingPongAllInitNodesUDP(t *testing.T) {
 				},
 				InitNodes: nodes,
 				MTU:       1345,
-				CryptoKey: []byte("1234567890123456"),
+				CryptoKey: testCryptoKey,
 				SelectNode: func() *Node {
 					return node2
 				},
@@ -75,7 +75,7 @@ func TestPingPongOneRandomNodeUDP(t *testing.T) {
 				},
 				InitNodes: nodes,
 				MTU:       1345,
-				CryptoKey: []byte("1234567890123456"),
+				CryptoKey: testCryptoKey,
 				SelectNode: func() *Node {
 					return node1
 				},
@@ -89,7 +89,7 @@ func TestPingPongOneRandomNodeUDP(t *testing.T) {
 				},
 				InitNodes: nodes,
 				MTU:       1345,
-				CryptoKey: []byte("1234567890123456"),
+				CryptoKey: testCryptoKey,
 			}
 		},
 	)
@@ -116,7 +116,7 @@ func BenchmarkUDP(b *testing.B) {
 		},
 		InitNodes: nodes,
 		MTU:       1345,
-		CryptoKey: []byte("1234567890123456"),
+		CryptoKey: testCryptoKey,
 		SelectNode: func() *Node {
 			return node1
 		},
@@ -128,7 +128,7 @@ func BenchmarkUDP(b *testing.B) {
 		},
 		InitNodes: nodes,
 		MTU:       1345,
-		CryptoKey: []byte("1234567890123456"),
+		CryptoKey: testCryptoKey,
 		SelectNode: func() *Node {
 			return node2
 		},

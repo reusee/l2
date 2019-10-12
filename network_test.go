@@ -12,6 +12,10 @@ import (
 	"github.com/vishvananda/netns"
 )
 
+var (
+	testCryptoKey = []byte("12345678901234567890123456789012")
+)
+
 func testPingPong(
 	t *testing.T,
 	getNetwork1 func() *Network,
