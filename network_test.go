@@ -26,7 +26,6 @@ func testPingPong(
 	}()
 
 	// node1
-	var ln net.Listener
 	ok1 := make(chan struct{})
 	var network1 *Network
 	go func() {
@@ -45,7 +44,7 @@ func testPingPong(
 			t.Fatal()
 		}
 
-		ln, err = net.Listen("tcp", network1.LocalNode.LanIP.String()+":34567")
+		ln, err := net.Listen("tcp", network1.LocalNode.LanIP.String()+":34567")
 		ce(err)
 		network1.Scope.Call(func(
 			spawn Spawn,
