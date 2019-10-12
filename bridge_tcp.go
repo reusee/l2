@@ -70,7 +70,7 @@ func startTCP(
 			// greeting packet
 			if err := network.writeOutbound(conn, &Outbound{
 				WireData: WireData{
-					IP: &network.LocalNode.LanIP,
+					IP: network.LocalNode.LanIP,
 				},
 			}); err != nil {
 				conn.CloseWrite()
@@ -132,7 +132,7 @@ func startTCP(
 			if inbound.IP != nil {
 				conn.RUnlock()
 				conn.Lock()
-				conn.IPs = append(conn.IPs, *inbound.IP)
+				conn.IPs = append(conn.IPs, inbound.IP)
 				conn.Unlock()
 				conn.RLock()
 			}

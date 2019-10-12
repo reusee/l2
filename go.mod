@@ -4,7 +4,9 @@ go 1.13
 
 require (
 	github.com/beevik/ntp v0.2.0
+	github.com/gogo/protobuf v1.3.0
 	github.com/google/gopacket v1.1.18-0.20190926102631-33810c487ced
+	github.com/google/protobuf v3.10.0+incompatible // indirect
 	github.com/reusee/dscope v0.0.0-20191011031537-621f80b82680
 	github.com/reusee/e/v2 v2.3.3
 	github.com/songgao/water v0.0.0-20190725173103-fd331bda3f4b

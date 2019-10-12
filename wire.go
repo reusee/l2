@@ -1,22 +1,14 @@
 package l2
 
 import (
-	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
 	"encoding/binary"
-	"encoding/gob"
 	"fmt"
 	"io"
 	"math/rand"
 	"net"
 )
-
-type WireData struct {
-	Eth    []byte
-	Serial uint64
-	IP     *net.IP
-}
 
 type Outbound struct {
 	WireData
@@ -40,11 +32,12 @@ type Inbound struct {
 }
 
 func (n *Network) writeOutbound(w io.Writer, outbound *Outbound) error {
-	buf := new(bytes.Buffer)
-	if err := gob.NewEncoder(buf).Encode(outbound.WireData); err != nil {
+	plaintext, err := outbound.WireData.Marshal()
+	if err != nil {
+		pt("%v\n", err)
 		return err
 	}
-	plaintext := buf.Bytes()
+
 	switch outbound.PreferFormat {
 
 	case FormatAESGCM:
@@ -123,8 +116,11 @@ func (n *Network) readInbound(r io.Reader) (inbound *Inbound, err error) {
 
 	}
 
-	if err = gob.NewDecoder(bytes.NewReader(plaintext)).Decode(&inbound); err != nil {
+	inbound = new(Inbound)
+	if err = inbound.WireData.Unmarshal(plaintext); err != nil {
+		pt("%v\n", err)
 		return
 	}
+
 	return
 }
