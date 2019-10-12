@@ -127,6 +127,12 @@ func (n *Network) Start(fns ...dyn) (err error) {
 		n.MTU = 1300
 	}
 	n.SetupInterfaces()
+	var ifaceHardwareAddrs []net.HardwareAddr
+	for _, iface := range n.ifaces {
+		netInterface, err := net.InterfaceByName(iface.Name())
+		ce(err)
+		ifaceHardwareAddrs = append(ifaceHardwareAddrs, netInterface.HardwareAddr)
+	}
 
 	// utils
 	var getTime = func() func() time.Time {
@@ -178,11 +184,13 @@ func (n *Network) Start(fns ...dyn) (err error) {
 			Closing,
 			*Network,
 			func() time.Time,
+			[]net.HardwareAddr,
 		) {
 			return spawn,
 				closing,
 				n,
-				getTime
+				getTime,
+				ifaceHardwareAddrs
 		},
 		Ev,
 	)
@@ -241,14 +249,9 @@ func (n *Network) Start(fns ...dyn) (err error) {
 
 	outboundSenderGroup := new(sync.WaitGroup)
 	var ifaceDoChans []chan func()
-	var ifaceHardwareAddrs []net.HardwareAddr
 	for _, iface := range n.ifaces {
 		iface := iface
 		outboundSenderGroup.Add(1)
-
-		netInterface, err := net.InterfaceByName(iface.Name())
-		ce(err)
-		ifaceHardwareAddrs = append(ifaceHardwareAddrs, netInterface.HardwareAddr)
 
 		// interface -> bridge
 		spawn(scope, func() {

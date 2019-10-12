@@ -9,6 +9,5 @@ option (gogoproto.marshaler_all) = true;
 message WireData {
   optional bytes Eth = 1;
   required uint64 Serial = 2 [(gogoproto.nullable) = false];
-  optional bytes IP = 3;
 }
 

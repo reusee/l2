@@ -37,6 +37,7 @@ func startTCP(
 	getTime func() time.Time,
 	trigger Trigger,
 	bridgeIndex BridgeIndex,
+	ifaceAddrs []net.HardwareAddr,
 ) {
 
 	// port
@@ -66,14 +67,31 @@ func startTCP(
 	// conn funcs
 	addConn := func(conn *TCPConn) {
 		doInLoop(func() {
-			// greeting packet
-			if err := network.writeOutbound(conn, &Outbound{
-				WireData: WireData{
-					IP: network.LocalNode.LanIP,
-				},
-			}); err != nil {
-				conn.CloseWrite()
-				return
+			// arp announcement
+			for _, addr := range ifaceAddrs {
+				ann := layers.ARP{
+					AddrType:          layers.LinkTypeEthernet,
+					Protocol:          layers.EthernetTypeARP,
+					HwAddressSize:     6,
+					ProtAddressSize:   4,
+					Operation:         2,
+					SourceHwAddress:   addr,
+					SourceProtAddress: network.LocalNode.LanIP,
+					DstHwAddress:      addr,
+					DstProtAddress:    network.LocalNode.LanIP,
+				}
+				buf := gopacket.NewSerializeBuffer()
+				opts := gopacket.SerializeOptions{} // See SerializeOptions for more details.
+				ce(ann.SerializeTo(buf, opts))
+				if err := network.writeOutbound(conn, &Outbound{
+					WireData: WireData{
+						Serial: 0,
+						Eth:    buf.Bytes(),
+					},
+				}); err != nil {
+					conn.CloseWrite()
+					return
+				}
 			}
 			conns = append(conns, conn)
 			trigger(scope.Sub(
@@ -128,13 +146,6 @@ func startTCP(
 			}
 
 			conn.RLock()
-			if inbound.IP != nil {
-				conn.RUnlock()
-				conn.Lock()
-				conn.IPs = append(conn.IPs, inbound.IP)
-				conn.Unlock()
-				conn.RLock()
-			}
 			if (len(conn.Addrs) == 0 || len(conn.IPs) == 0) && len(inbound.Eth) > 0 {
 				conn.RUnlock()
 				parser.DecodeLayers(inbound.Eth, &decoded)
