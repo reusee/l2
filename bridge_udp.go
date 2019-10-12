@@ -259,7 +259,7 @@ func startUDP(
 						}
 
 					case layers.LayerTypeARP:
-						if !bytes.Equal(arp.SourceProtAddress, IPv4zero) {
+						if !IPv4zero.Equal(arp.SourceProtAddress) {
 							ip := make(net.IP, len(arp.SourceProtAddress))
 							copy(ip, arp.SourceProtAddress)
 							for _, i := range remote.IPs {
@@ -274,7 +274,7 @@ func startUDP(
 						}
 
 					case layers.LayerTypeIPv4:
-						if !bytes.Equal(ipv4.SrcIP, IPv4zero) {
+						if !IPv4zero.Equal(ipv4.SrcIP) {
 							ip := make(net.IP, len(ipv4.SrcIP))
 							copy(ip, ipv4.SrcIP)
 							for _, i := range remote.IPs {
