@@ -197,19 +197,21 @@ func startTCP(
 						}
 
 					case layers.LayerTypeIPv4:
-						ip := make(net.IP, len(ipv4.SrcIP))
-						copy(ip, ipv4.SrcIP)
-						for _, i := range conn.IPs {
-							if i.Equal(ip) {
-								break s
+						if !bytes.Equal(ipv4.SrcIP, IPv4zero) {
+							ip := make(net.IP, len(ipv4.SrcIP))
+							copy(ip, ipv4.SrcIP)
+							for _, i := range conn.IPs {
+								if i.Equal(ip) {
+									break s
+								}
 							}
+							conn.Lock()
+							conn.IPs = append(conn.IPs, ip)
+							conn.Unlock()
+							trigger(scope.Sub(
+								&conn, &ip,
+							), EvTCP, EvTCPConnGotIP)
 						}
-						conn.Lock()
-						conn.IPs = append(conn.IPs, ip)
-						conn.Unlock()
-						trigger(scope.Sub(
-							&conn, &ip,
-						), EvTCP, EvTCPConnGotIP)
 
 					}
 				}
