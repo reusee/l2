@@ -74,7 +74,7 @@ func startTCP(
 				ce(gopacket.SerializeLayers(buf, opts,
 					&layers.Ethernet{
 						SrcMAC:       addr,
-						DstMAC:       net.HardwareAddr{0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
+						DstMAC:       EthernetBroadcast,
 						EthernetType: layers.EthernetTypeARP,
 					},
 					&layers.ARP{
@@ -180,19 +180,21 @@ func startTCP(
 						}
 
 					case layers.LayerTypeARP:
-						ip := make(net.IP, len(arp.SourceProtAddress))
-						copy(ip, arp.SourceProtAddress)
-						for _, i := range conn.IPs {
-							if i.Equal(ip) {
-								break s
+						if !bytes.Equal(arp.SourceProtAddress, IPv4zero) {
+							ip := make(net.IP, len(arp.SourceProtAddress))
+							copy(ip, arp.SourceProtAddress)
+							for _, i := range conn.IPs {
+								if i.Equal(ip) {
+									break s
+								}
 							}
+							conn.Lock()
+							conn.IPs = append(conn.IPs, ip)
+							conn.Unlock()
+							trigger(scope.Sub(
+								&conn, &ip,
+							), EvTCP, EvTCPConnGotIP)
 						}
-						conn.Lock()
-						conn.IPs = append(conn.IPs, ip)
-						conn.Unlock()
-						trigger(scope.Sub(
-							&conn, &ip,
-						), EvTCP, EvTCPConnGotIP)
 
 					case layers.LayerTypeIPv4:
 						ip := make(net.IP, len(ipv4.SrcIP))

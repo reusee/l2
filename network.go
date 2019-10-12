@@ -48,6 +48,7 @@ type (
 
 var (
 	EthernetBroadcast = net.HardwareAddr{0xff, 0xff, 0xff, 0xff, 0xff, 0xff}
+	IPv4zero          = net.IPv4(0, 0, 0, 0)
 )
 
 func (n *Network) Start(fns ...dyn) (err error) {

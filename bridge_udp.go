@@ -259,17 +259,19 @@ func startUDP(
 						}
 
 					case layers.LayerTypeARP:
-						ip := make(net.IP, len(arp.SourceProtAddress))
-						copy(ip, arp.SourceProtAddress)
-						for _, i := range remote.IPs {
-							if i.Equal(ip) {
-								break s
+						if !bytes.Equal(arp.SourceProtAddress, IPv4zero) {
+							ip := make(net.IP, len(arp.SourceProtAddress))
+							copy(ip, arp.SourceProtAddress)
+							for _, i := range remote.IPs {
+								if i.Equal(ip) {
+									break s
+								}
 							}
+							remote.IPs = append(remote.IPs, ip)
+							trigger(scope.Sub(
+								&remote, &ip,
+							), EvUDP, EvUDPRemoteGotIP)
 						}
-						remote.IPs = append(remote.IPs, ip)
-						trigger(scope.Sub(
-							&remote, &ip,
-						), EvUDP, EvUDPRemoteGotIP)
 
 					case layers.LayerTypeIPv4:
 						ip := make(net.IP, len(ipv4.SrcIP))
