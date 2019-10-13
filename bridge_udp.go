@@ -3,7 +3,6 @@ package l2
 import (
 	"bytes"
 	"fmt"
-	"math/rand"
 	"net"
 	"sync"
 	"time"
@@ -48,7 +47,7 @@ func startUDP(
 
 	portShiftInterval := time.Millisecond * 8311
 	localConnDuration := portShiftInterval * 2
-	remoteDuration := portShiftInterval * 32
+	remoteDuration := portShiftInterval * 3
 
 	getPort := shiftingPort(
 		fmt.Sprintf("%x-udp-", network.CryptoKey),
@@ -309,8 +308,7 @@ func startUDP(
 
 			sent := false
 
-			now := getTime()
-			for i := range rand.Perm(len(remotes)) {
+			for i := len(remotes) - 1; i >= 0; i-- {
 				remote := remotes[i]
 
 				// filter
@@ -318,9 +316,6 @@ func startUDP(
 				ipMatched := false
 				addrMatched := false
 				if len(remote.Addrs) == 0 && len(remote.IPs) == 0 {
-					skip = true
-				}
-				if now.Sub(remote.AddedAt)+time.Second*10 > remoteDuration {
 					skip = true
 				}
 				if outbound.DestIP != nil && len(remote.IPs) > 0 {
