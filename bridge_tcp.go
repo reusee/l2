@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"math/rand"
 	"net"
 	"strconv"
 	"sync"
@@ -21,6 +22,7 @@ type TCPListener struct {
 type TCPConn struct {
 	sync.RWMutex
 	*net.TCPConn
+	T0    time.Time
 	IPs   []net.IP
 	Addrs []net.HardwareAddr
 }
@@ -43,7 +45,7 @@ func startTCP(
 	// port
 	portShiftInterval := time.Millisecond * 5113
 	listenerDuration := portShiftInterval * 2
-	connDuration := portShiftInterval * 3
+	connDuration := portShiftInterval * 32
 	getPort := shiftingPort(
 		fmt.Sprintf("%x-tcp-", network.CryptoKey),
 		portShiftInterval,
@@ -283,6 +285,7 @@ func startTCP(
 							netConn.SetDeadline(getTime().Add(connDuration))
 							conn := &TCPConn{
 								TCPConn: netConn.(*net.TCPConn),
+								T0:      now,
 							}
 							addConn(conn)
 							readConn(conn)
@@ -324,6 +327,7 @@ func startTCP(
 						IPs: []net.IP{
 							node.LanIP,
 						},
+						T0: now,
 					}
 					addConn(conn)
 					readConn(conn)
@@ -353,7 +357,8 @@ func startTCP(
 
 			sent := false
 
-			for i := len(conns) - 1; i >= 0; i-- {
+			now := getTime()
+			for i := range rand.Perm(len(conns)) {
 				conn := conns[i]
 
 				// filter
@@ -362,6 +367,9 @@ func startTCP(
 				addrMatched := false
 				conn.RLock()
 				if len(conn.Addrs) == 0 && len(conn.IPs) == 0 {
+					skip = true
+				}
+				if now.Sub(conn.T0)+time.Second*10 > connDuration {
 					skip = true
 				}
 				if outbound.DestIP != nil && len(conn.IPs) > 0 {
