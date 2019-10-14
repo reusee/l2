@@ -95,7 +95,7 @@ func startTCP(
 						Eth:    buf.Bytes(),
 					},
 				}); err != nil {
-					conn.CloseWrite()
+					_ = conn.CloseWrite()
 					return
 				}
 			}
@@ -142,7 +142,7 @@ func startTCP(
 				trigger(scope.Sub(
 					&conn, &err,
 				), EvTCP, EvTCPReadInboundError)
-				conn.CloseRead()
+				_ = conn.CloseRead()
 				select {
 				case <-closing:
 				default:
@@ -280,7 +280,9 @@ func startTCP(
 						), EvTCP, EvTCPAccepted)
 
 						spawn(scope, func() {
-							netConn.SetDeadline(getTime().Add(connDuration))
+							if err := netConn.SetDeadline(getTime().Add(connDuration)); err != nil {
+								return
+							}
 							conn := &TCPConn{
 								TCPConn: netConn.(*net.TCPConn),
 							}
@@ -318,7 +320,9 @@ func startTCP(
 					trigger(scope.Sub(
 						&node, &netConn,
 					), EvTCP, EvTCPDialed)
-					netConn.SetDeadline(getTime().Add(connDuration))
+					if err := netConn.SetDeadline(getTime().Add(connDuration)); err != nil {
+						return
+					}
 					conn := &TCPConn{
 						TCPConn: netConn.(*net.TCPConn),
 						IPs: []net.IP{
@@ -399,7 +403,7 @@ func startTCP(
 
 				// send
 				if err := network.writeOutbound(conn, outbound); err != nil {
-					conn.CloseWrite()
+					_ = conn.CloseWrite()
 					trigger(scope.Sub(
 						&conn, &outbound, &err,
 					), EvTCP, EvTCPWriteOutboundError)
@@ -447,7 +451,7 @@ func startTCP(
 				ln.Listener.Close()
 			}
 			for _, conn := range conns {
-				conn.SetDeadline(getTime().Add(-time.Hour))
+				_ = conn.SetDeadline(getTime().Add(-time.Hour))
 			}
 			trigger(scope, EvTCP, EvTCPClosed)
 			return

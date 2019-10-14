@@ -45,7 +45,7 @@ func testPingPong(
 		err = network1.Start()
 		ce(err)
 		if !network1.Network.Contains(network1.LocalNode.LanIP) {
-			t.Fatal()
+			panic("fail")
 		}
 
 		ln, err := net.Listen("tcp", network1.LocalNode.LanIP.String()+":34567")

@@ -27,7 +27,8 @@ type (
 
 func init() {
 	var seed int64
-	binary.Read(crand.Reader, binary.LittleEndian, &seed)
+	err := binary.Read(crand.Reader, binary.LittleEndian, &seed)
+	ce(err)
 	rand.Seed(seed)
 }
 
@@ -42,6 +43,7 @@ func dumpEth(bs []byte) {
 
 func hash64(bs []byte) uint64 {
 	h := fnv.New64()
-	h.Write(bs)
+	_, err := h.Write(bs)
+	ce(err)
 	return h.Sum64()
 }

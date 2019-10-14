@@ -444,7 +444,8 @@ func (n *Network) Start(fns ...dyn) (err error) {
 					}
 					iface := n.ifaces[i]
 					ch <- func() {
-						iface.Write(inbound.Eth)
+						_, err := iface.Write(inbound.Eth)
+						ce(err)
 						trigger(scope.Sub(
 							&inbound,
 						), EvNetwork, EvNetworkInboundWritten)
@@ -453,7 +454,8 @@ func (n *Network) Start(fns ...dyn) (err error) {
 				}
 
 			case bs := <-n.InjectFrame:
-				n.ifaces[0].Write(bs)
+				_, err := n.ifaces[0].Write(bs)
+				ce(err)
 
 			case <-closing:
 				return
