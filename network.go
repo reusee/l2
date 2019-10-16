@@ -117,6 +117,16 @@ func (n *Network) Start(fns ...dyn) (err error) {
 		n.InitNodes = append(n.InitNodes, localNode)
 	}
 
+	// local net addrs
+	var ifaceAddrs []net.Addr
+	ifaces, err := net.Interfaces()
+	ce(err)
+	for _, iface := range ifaces {
+		addrs, err := iface.Addrs()
+		ce(err)
+		ifaceAddrs = append(ifaceAddrs, addrs...)
+	}
+
 	// nodes
 	for _, node := range n.InitNodes {
 		node.Init()
@@ -170,30 +180,23 @@ func (n *Network) Start(fns ...dyn) (err error) {
 	}()
 
 	// scope
-	closing := make(chan struct{})
+	closing := Closing(make(chan struct{}))
 	n.closing = closing
-	spawn := func(scope Scope, fn any) {
+	spawn := Spawn(func(scope Scope, fn any) {
 		n.waitClose.Add(1)
 		go func() {
 			defer n.waitClose.Done()
 			scope.Call(fn)
 		}()
-	}
+	})
 	scope := dscope.New(
-		func() (
-			Spawn,
-			Closing,
-			*Network,
-			func() time.Time,
-			[]net.HardwareAddr,
-		) {
-			return spawn,
-				closing,
-				n,
-				getTime,
-				ifaceHardwareAddrs
-		},
 		Ev,
+		&spawn,
+		&closing,
+		&n,
+		&getTime,
+		&ifaceHardwareAddrs,
+		&ifaceAddrs,
 	)
 	n.Scope = scope
 	var on On

@@ -38,6 +38,7 @@ func startTCP(
 	trigger Trigger,
 	bridgeIndex BridgeIndex,
 	ifaceAddrs []net.HardwareAddr,
+	localAddrs []net.Addr,
 ) {
 
 	// port
@@ -247,7 +248,7 @@ func startTCP(
 			node := node
 			now := getTime()
 
-			if node == network.LocalNode && node.WanHost != "" {
+			if node == network.LocalNode {
 				port := getPort(node, now.Add(time.Millisecond*500))
 				hostPort := net.JoinHostPort("0.0.0.0", strconv.Itoa(port))
 
@@ -295,43 +296,55 @@ func startTCP(
 
 				listeners[hostPort] = listener
 
-			} else if node.WanHost != "" {
+			} else {
 				// non-local node
 
-				port := getPort(node, now)
-				hostPort := net.JoinHostPort(node.wanIP.String(), strconv.Itoa(port))
-				exists := false
-				for _, c := range conns {
-					if c.RemoteAddr().String() == hostPort {
-						exists = true
-						break
+				ip := node.wanIP
+				if len(ip) == 0 && len(node.PrivateIP) > 0 {
+					for _, addr := range localAddrs {
+						if ipnet, ok := addr.(*net.IPNet); ok && ipnet.Contains(node.PrivateIP) {
+							ip = node.PrivateIP
+							break
+						}
 					}
-				}
-				if exists {
-					continue
 				}
 
-				// connect
-				spawn(scope, func() {
-					netConn, err := dialer.Dial("tcp", hostPort)
-					if err != nil {
-						return
+				if len(ip) > 0 {
+					port := getPort(node, now)
+					hostPort := net.JoinHostPort(ip.String(), strconv.Itoa(port))
+					exists := false
+					for _, c := range conns {
+						if c.RemoteAddr().String() == hostPort {
+							exists = true
+							break
+						}
 					}
-					trigger(scope.Sub(
-						&node, &netConn,
-					), EvTCP, EvTCPDialed)
-					if err := netConn.SetDeadline(getTime().Add(connDuration)); err != nil {
-						return
+					if exists {
+						continue
 					}
-					conn := &TCPConn{
-						TCPConn: netConn.(*net.TCPConn),
-						IPs: []net.IP{
-							node.LanIP,
-						},
-					}
-					addConn(conn)
-					readConn(conn)
-				})
+
+					// connect
+					spawn(scope, func() {
+						netConn, err := dialer.Dial("tcp", hostPort)
+						if err != nil {
+							return
+						}
+						trigger(scope.Sub(
+							&node, &netConn,
+						), EvTCP, EvTCPDialed)
+						if err := netConn.SetDeadline(getTime().Add(connDuration)); err != nil {
+							return
+						}
+						conn := &TCPConn{
+							TCPConn: netConn.(*net.TCPConn),
+							IPs: []net.IP{
+								node.LanIP,
+							},
+						}
+						addConn(conn)
+						readConn(conn)
+					})
+				}
 
 			}
 

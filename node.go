@@ -6,7 +6,8 @@ import (
 
 type Node struct {
 	LanIP       net.IP
-	WanHost     string
+	WanHost     string // reachable from anywhere
+	PrivateIP   net.IP // reachable from local lan
 	BridgeNames []string
 
 	wanIP    net.IP

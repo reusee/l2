@@ -43,6 +43,7 @@ func startUDP(
 	inboundSenderGroup *sync.WaitGroup,
 	trigger Trigger,
 	bridgeIndex BridgeIndex,
+	localAddrs []net.Addr,
 ) {
 
 	portShiftInterval := time.Millisecond * 8311
@@ -74,7 +75,16 @@ func startUDP(
 				// non remote
 				continue
 			}
-			if node.WanHost == "" {
+			ip := node.wanIP
+			if len(ip) == 0 && len(node.PrivateIP) > 0 {
+				for _, addr := range localAddrs {
+					if ipnet, ok := addr.(*net.IPNet); ok && ipnet.Contains(node.PrivateIP) {
+						ip = node.PrivateIP
+						break
+					}
+				}
+			}
+			if len(ip) == 0 {
 				continue
 			}
 			node := node
