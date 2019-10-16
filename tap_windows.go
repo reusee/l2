@@ -12,7 +12,7 @@ import (
 	"golang.org/x/text/transform"
 )
 
-func (n *Network) SetupInterfaces() {
+func (n *Network) SetupInterface() {
 	interfaceType := water.DeviceType(water.TAP)
 	iface, err := water.New(water.Config{
 		DeviceType: interfaceType,
@@ -58,7 +58,7 @@ func (n *Network) SetupInterfaces() {
 
 	time.Sleep(time.Second * 3)
 
-	n.ifaces = append(n.ifaces, iface)
+	n.iface = iface
 }
 
 func fromGBK(bs []byte) []byte {

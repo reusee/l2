@@ -32,7 +32,7 @@ type Network struct {
 	LocalNode *Node
 
 	nodes     atomic.Value
-	ifaces    []*water.Interface
+	iface     *water.Interface
 	closing   chan struct{}
 	waitClose sync.WaitGroup
 	closeOnce sync.Once
@@ -137,13 +137,10 @@ func (n *Network) Start(fns ...dyn) (err error) {
 	if n.MTU == 0 {
 		n.MTU = 1300
 	}
-	n.SetupInterfaces()
-	var ifaceHardwareAddrs []net.HardwareAddr
-	for _, iface := range n.ifaces {
-		netInterface, err := net.InterfaceByName(iface.Name())
-		ce(err)
-		ifaceHardwareAddrs = append(ifaceHardwareAddrs, netInterface.HardwareAddr)
-	}
+	n.SetupInterface()
+	netInterface, err := net.InterfaceByName(n.iface.Name())
+	ce(err)
+	ifaceHardwareAddr := netInterface.HardwareAddr
 
 	// utils
 	var getTime = func() func() time.Time {
@@ -195,7 +192,7 @@ func (n *Network) Start(fns ...dyn) (err error) {
 		&closing,
 		&n,
 		&getTime,
-		&ifaceHardwareAddrs,
+		&ifaceHardwareAddr,
 		&ifaceAddrs,
 	)
 	n.Scope = scope
@@ -252,130 +249,123 @@ func (n *Network) Start(fns ...dyn) (err error) {
 	}
 
 	outboundSenderGroup := new(sync.WaitGroup)
-	var ifaceDoChans []chan func()
-	for _, iface := range n.ifaces {
-		iface := iface
-		outboundSenderGroup.Add(1)
+	outboundSenderGroup.Add(1)
 
-		// interface -> bridge
-		spawn(scope, func() {
-			defer outboundSenderGroup.Done()
+	// interface -> bridge
+	spawn(scope, func() {
+		defer outboundSenderGroup.Done()
 
-			buf := make([]byte, n.MTU+14)
-			parser := gopacket.NewDecodingLayerParser(layers.LayerTypeEthernet)
-			parser.SetDecodingLayerContainer(gopacket.DecodingLayerSparse(nil))
-			var eth layers.Ethernet
-			var arp layers.ARP
-			var ipv4 layers.IPv4
-			parser.AddDecodingLayer(&eth)
-			parser.AddDecodingLayer(&ipv4)
-			parser.AddDecodingLayer(&arp)
-			decoded := make([]gopacket.LayerType, 0, 10)
-			serial := rand.Uint64()
+		buf := make([]byte, n.MTU+14)
+		parser := gopacket.NewDecodingLayerParser(layers.LayerTypeEthernet)
+		parser.SetDecodingLayerContainer(gopacket.DecodingLayerSparse(nil))
+		var eth layers.Ethernet
+		var arp layers.ARP
+		var ipv4 layers.IPv4
+		parser.AddDecodingLayer(&eth)
+		parser.AddDecodingLayer(&ipv4)
+		parser.AddDecodingLayer(&arp)
+		decoded := make([]gopacket.LayerType, 0, 10)
+		serial := rand.Uint64()
 
-		loop:
-			for {
-				l, err := iface.Read(buf)
-				if err != nil {
-					select {
-					case <-closing:
-						return
-					default:
-						ce(err, "read from interface")
-					}
-				}
-				bs := buf[:l]
-
-				var destIP *net.IP
-				var destAddr *net.HardwareAddr
-				parser.DecodeLayers(bs, &decoded)
-
-				for _, t := range decoded {
-					switch t {
-
-					case layers.LayerTypeEthernet:
-						// skip ipv6
-						if eth.EthernetType == layers.EthernetTypeIPv6 {
-							continue loop
-						}
-						// dest mac
-						if !bytes.Equal(eth.DstMAC, EthernetBroadcast) {
-							addr := make(net.HardwareAddr, len(eth.DstMAC))
-							copy(addr, eth.DstMAC)
-							destAddr = &addr
-						}
-
-					case layers.LayerTypeARP:
-						// dest ip
-						ip := make(net.IP, len(arp.DstProtAddress))
-						copy(ip, arp.DstProtAddress)
-						destIP = &ip
-
-					case layers.LayerTypeIPv4:
-						// skip
-						if !n.Network.Contains(ipv4.DstIP) {
-							continue loop
-						}
-						// dest ip
-						ip := make(net.IP, len(ipv4.DstIP))
-						copy(ip, ipv4.DstIP)
-						destIP = &ip
-
-					}
-				}
-
-				if n.OnFrame != nil {
-					n.OnFrame(bs)
-				}
-
-				sn := atomic.AddUint64(&serial, 1)
-				eth := make([]byte, l)
-				copy(eth, bs)
-				outbound := &Outbound{
-					WireData: WireData{
-						Eth:    eth,
-						Serial: sn,
-					},
-					DestIP:   destIP,
-					DestAddr: destAddr,
-				}
-				jobs <- func() {
-					ce(outbound.encode(n.CryptoKey))
-				}
-				for _, ch := range outboundChans {
-					select {
-					case ch <- outbound:
-					case <-closing:
-					}
-				}
-				trigger(scope.Sub(
-					&outbound,
-				), EvNetwork, EvNetworkOutboundSent)
-
-			}
-		})
-
-		// bridge -> interface
-		doChan := make(chan func(), 1024)
-		ifaceDoChans = append(ifaceDoChans, doChan)
-		spawn(scope, func(
-			closing Closing,
-		) {
-			for {
+	loop:
+		for {
+			l, err := n.iface.Read(buf)
+			if err != nil {
 				select {
 				case <-closing:
 					return
-				case fn := <-doChan:
-					fn()
+				default:
+					ce(err, "read from interface")
 				}
 			}
-		})
+			bs := buf[:l]
 
-	}
-	on(EvNetworkClosing, func() {
-		for _, iface := range n.ifaces {
-			iface.Close()
+			var destIP *net.IP
+			var destAddr *net.HardwareAddr
+			parser.DecodeLayers(bs, &decoded)
+
+			for _, t := range decoded {
+				switch t {
+
+				case layers.LayerTypeEthernet:
+					// skip ipv6
+					if eth.EthernetType == layers.EthernetTypeIPv6 {
+						continue loop
+					}
+					// dest mac
+					if !bytes.Equal(eth.DstMAC, EthernetBroadcast) {
+						addr := make(net.HardwareAddr, len(eth.DstMAC))
+						copy(addr, eth.DstMAC)
+						destAddr = &addr
+					}
+
+				case layers.LayerTypeARP:
+					// dest ip
+					ip := make(net.IP, len(arp.DstProtAddress))
+					copy(ip, arp.DstProtAddress)
+					destIP = &ip
+
+				case layers.LayerTypeIPv4:
+					// skip
+					if !n.Network.Contains(ipv4.DstIP) {
+						continue loop
+					}
+					// dest ip
+					ip := make(net.IP, len(ipv4.DstIP))
+					copy(ip, ipv4.DstIP)
+					destIP = &ip
+
+				}
+			}
+
+			if n.OnFrame != nil {
+				n.OnFrame(bs)
+			}
+
+			sn := atomic.AddUint64(&serial, 1)
+			eth := make([]byte, l)
+			copy(eth, bs)
+			outbound := &Outbound{
+				WireData: WireData{
+					Eth:    eth,
+					Serial: sn,
+				},
+				DestIP:   destIP,
+				DestAddr: destAddr,
+			}
+			jobs <- func() {
+				ce(outbound.encode(n.CryptoKey))
+			}
+			for _, ch := range outboundChans {
+				select {
+				case ch <- outbound:
+				case <-closing:
+				}
+			}
+			trigger(scope.Sub(
+				&outbound,
+			), EvNetwork, EvNetworkOutboundSent)
+
 		}
+	})
+
+	// bridge -> interface
+	doChan := make(chan func(), 1024)
+	spawn(scope, func(
+		closing Closing,
+	) {
+		for {
+			select {
+			case <-closing:
+				return
+			case fn := <-doChan:
+				fn()
+			}
+		}
+	})
+
+	on(EvNetworkClosing, func() {
+		n.iface.Close()
 		outboundSenderGroup.Wait()
 	})
 
@@ -441,25 +431,21 @@ func (n *Network) Start(fns ...dyn) (err error) {
 					}
 				}
 
-				for i, ch := range ifaceDoChans {
-					if inbound.DestAddr != nil && !bytes.Equal(*inbound.DestAddr, ifaceHardwareAddrs[i]) {
-						continue
-					}
-					iface := n.ifaces[i]
-					ch <- func() {
-						_, err := iface.Write(inbound.Eth)
-						if err != nil {
-							return
-						}
-						trigger(scope.Sub(
-							&inbound,
-						), EvNetwork, EvNetworkInboundWritten)
-					}
+				if inbound.DestAddr != nil && !bytes.Equal(*inbound.DestAddr, ifaceHardwareAddr) {
 					break
+				}
+				doChan <- func() {
+					_, err := n.iface.Write(inbound.Eth)
+					if err != nil {
+						return
+					}
+					trigger(scope.Sub(
+						&inbound,
+					), EvNetwork, EvNetworkInboundWritten)
 				}
 
 			case bs := <-n.InjectFrame:
-				_, _ = n.ifaces[0].Write(bs)
+				_, _ = n.iface.Write(bs)
 
 			case <-closing:
 				return
