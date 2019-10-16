@@ -91,7 +91,7 @@ func startUDP(
 			now := getTime()
 			remotePort := getPort(node, now)
 			udpAddr := &net.UDPAddr{
-				IP:   node.wanIP,
+				IP:   ip,
 				Port: remotePort,
 			}
 			udpAddrStr := udpAddr.String()
