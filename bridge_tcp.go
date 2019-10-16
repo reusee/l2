@@ -341,6 +341,9 @@ func startTCP(
 								node.LanIP,
 							},
 						}
+						trigger(scope.Sub(
+							&conn, &node.LanIP,
+						), EvTCP, EvTCPConnGotIP)
 						addConn(conn)
 						readConn(conn)
 					})
