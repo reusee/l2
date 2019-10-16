@@ -121,7 +121,10 @@ func startUDP(
 			// arp announcement
 			for _, addr := range ifaceAddrs {
 				buf := gopacket.NewSerializeBuffer()
-				opts := gopacket.SerializeOptions{}
+				opts := gopacket.SerializeOptions{
+					FixLengths:       true,
+					ComputeChecksums: true,
+				}
 				ce(gopacket.SerializeLayers(buf, opts,
 					&layers.Ethernet{
 						SrcMAC:       addr,
@@ -130,14 +133,14 @@ func startUDP(
 					},
 					&layers.ARP{
 						AddrType:          layers.LinkTypeEthernet,
-						Protocol:          layers.EthernetTypeARP,
+						Protocol:          layers.EthernetTypeIPv4,
 						HwAddressSize:     6,
 						ProtAddressSize:   4,
 						Operation:         2,
 						SourceHwAddress:   addr,
-						SourceProtAddress: network.LocalNode.LanIP,
+						SourceProtAddress: network.LocalNode.LanIP.To4(),
 						DstHwAddress:      addr,
-						DstProtAddress:    network.LocalNode.LanIP,
+						DstProtAddress:    network.LocalNode.LanIP.To4(),
 					},
 				))
 				outbound := &Outbound{
