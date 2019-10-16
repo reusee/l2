@@ -44,6 +44,7 @@ func startUDP(
 	trigger Trigger,
 	bridgeIndex BridgeIndex,
 	localAddrs []net.Addr,
+	ifaceAddrs []net.HardwareAddr,
 ) {
 
 	portShiftInterval := time.Millisecond * 8311
@@ -71,10 +72,12 @@ func startUDP(
 			if !hasUDP {
 				continue
 			}
+
 			if node == network.LocalNode {
 				// non remote
 				continue
 			}
+
 			ip := node.wanIP
 			if len(ip) == 0 && len(node.PrivateIP) > 0 {
 				for _, addr := range localAddrs {
@@ -87,6 +90,7 @@ func startUDP(
 			if len(ip) == 0 {
 				continue
 			}
+
 			node := node
 			now := getTime()
 			remotePort := getPort(node, now)
@@ -100,6 +104,7 @@ func startUDP(
 					continue loop_nodes
 				}
 			}
+
 			remote := &UDPRemote{
 				UDPAddr:    udpAddr,
 				UDPAddrStr: udpAddrStr,
@@ -112,6 +117,50 @@ func startUDP(
 			trigger(scope.Sub(
 				&remote,
 			), EvUDP, EvUDPRemoteAdded)
+
+			// arp announcement
+			for _, addr := range ifaceAddrs {
+				buf := gopacket.NewSerializeBuffer()
+				opts := gopacket.SerializeOptions{}
+				ce(gopacket.SerializeLayers(buf, opts,
+					&layers.Ethernet{
+						SrcMAC:       addr,
+						DstMAC:       EthernetBroadcast,
+						EthernetType: layers.EthernetTypeARP,
+					},
+					&layers.ARP{
+						AddrType:          layers.LinkTypeEthernet,
+						Protocol:          layers.EthernetTypeARP,
+						HwAddressSize:     6,
+						ProtAddressSize:   4,
+						Operation:         2,
+						SourceHwAddress:   addr,
+						SourceProtAddress: network.LocalNode.LanIP,
+						DstHwAddress:      addr,
+						DstProtAddress:    network.LocalNode.LanIP,
+					},
+				))
+				outbound := &Outbound{
+					WireData: WireData{
+						Serial: 0,
+						Eth:    buf.Bytes(),
+					},
+				}
+				out := new(bytes.Buffer)
+				ce(network.writeOutbound(out, outbound))
+				for i := len(locals) - 1; i >= 0; i-- {
+					local := locals[i]
+					_, err := local.Conn.WriteToUDP(out.Bytes(), remote.UDPAddr)
+					if err != nil {
+						trigger(scope.Sub(
+							&local, &outbound, &remote,
+						), EvUDP, EvUDPWriteOutboundError)
+						continue
+					}
+					break
+				}
+			}
+
 		}
 	}
 	updateRemotes()
