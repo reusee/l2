@@ -278,6 +278,18 @@ func (n *Network) Start(fns ...dyn) (err error) {
 		parser.AddDecodingLayer(&udp)
 		decoded := make([]gopacket.LayerType, 0, 10)
 		serial := rand.Uint64()
+		frameScope := scope.Sub(
+			func() (
+				*layers.Ethernet,
+				*layers.ARP,
+				*layers.IPv4,
+				*layers.TCP,
+				*layers.UDP,
+				*[]gopacket.LayerType,
+			) {
+				return &eth, &arp, &ipv4, &tcp, &udp, &decoded
+			},
+		)
 
 	loop:
 		for {
@@ -336,21 +348,13 @@ func (n *Network) Start(fns ...dyn) (err error) {
 
 			sn := atomic.AddUint64(&serial, 1)
 
-			eth := make([]byte, l)
-			copy(eth, bs)
+			ethBytes := make([]byte, l)
+			copy(ethBytes, bs)
 
 			preferFormat := WireFormat(0) // default
 			if n.PreferFormat != nil {
 				var format WireFormat
-				scope.Sub(
-					&eth,
-					&arp,
-					&ipv4,
-					&tcp,
-					&udp,
-					&decoded,
-					&eth,
-				).Call(n.PreferFormat, &format)
+				frameScope.Call(n.PreferFormat, &format)
 				if format != preferFormat {
 					preferFormat = format
 				}
@@ -358,7 +362,7 @@ func (n *Network) Start(fns ...dyn) (err error) {
 
 			outbound := &Outbound{
 				WireData: WireData{
-					Eth:    eth,
+					Eth:    ethBytes,
 					Serial: sn,
 				},
 				DestIP:       destIP,
