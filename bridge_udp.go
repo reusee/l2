@@ -301,9 +301,11 @@ func startUDP(
 					switch t {
 
 					case layers.LayerTypeEthernet:
-						destAddr := make(net.HardwareAddr, len(eth.DstMAC))
-						copy(destAddr, eth.DstMAC)
-						inbound.Inbound.DestAddr = &destAddr
+						if !bytes.Equal(eth.DstMAC, EthernetBroadcast) {
+							destAddr := make(net.HardwareAddr, len(eth.DstMAC))
+							copy(destAddr, eth.DstMAC)
+							inbound.Inbound.DestAddr = &destAddr
+						}
 						if !bytes.Equal(eth.SrcMAC, EthernetBroadcast) {
 							addr := make(net.HardwareAddr, len(eth.SrcMAC))
 							copy(addr, eth.SrcMAC)
