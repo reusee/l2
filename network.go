@@ -411,6 +411,7 @@ func (n *Network) Start(fns ...dyn) (err error) {
 					switch t {
 
 					case layers.LayerTypeEthernet:
+						// de-duplicate
 						if inbound.Serial > 0 {
 							copy(macBytes, eth.SrcMAC)
 							macInt := binary.LittleEndian.Uint64(macBytes)
@@ -431,7 +432,9 @@ func (n *Network) Start(fns ...dyn) (err error) {
 					}
 				}
 
-				if inbound.DestAddr != nil && !bytes.Equal(*inbound.DestAddr, ifaceHardwareAddr) {
+				if inbound.DestAddr != nil &&
+					!bytes.Equal(*inbound.DestAddr, EthernetBroadcast) &&
+					!bytes.Equal(*inbound.DestAddr, ifaceHardwareAddr) {
 					break
 				}
 				doChan <- func() {
