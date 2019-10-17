@@ -24,10 +24,11 @@ type Network struct {
 	MTU       int
 	CryptoKey []byte
 
-	Scope       Scope
-	SelectNode  dyn
-	OnFrame     func([]byte)
-	InjectFrame chan ([]byte)
+	Scope        Scope
+	SelectNode   dyn
+	OnFrame      func([]byte)
+	InjectFrame  chan ([]byte)
+	PreferFormat dyn
 
 	LocalNode *Node
 
@@ -325,13 +326,22 @@ func (n *Network) Start(fns ...dyn) (err error) {
 			sn := atomic.AddUint64(&serial, 1)
 			eth := make([]byte, l)
 			copy(eth, bs)
+			preferFormat := WireFormat(0)
+			if n.PreferFormat != nil {
+				var format WireFormat
+				scope.Call(n.PreferFormat, &format)
+				if format != preferFormat {
+					preferFormat = format
+				}
+			}
 			outbound := &Outbound{
 				WireData: WireData{
 					Eth:    eth,
 					Serial: sn,
 				},
-				DestIP:   destIP,
-				DestAddr: destAddr,
+				DestIP:       destIP,
+				DestAddr:     destAddr,
+				PreferFormat: preferFormat,
 			}
 			jobs <- func() {
 				ce(outbound.encode(n.CryptoKey))
