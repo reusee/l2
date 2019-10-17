@@ -68,41 +68,6 @@ func startTCP(
 	// conn funcs
 	addConn := func(conn *TCPConn) {
 		doInLoop(func() {
-
-			// arp announcement
-			buf := gopacket.NewSerializeBuffer()
-			opts := gopacket.SerializeOptions{
-				FixLengths:       true,
-				ComputeChecksums: true,
-			}
-			ce(gopacket.SerializeLayers(buf, opts,
-				&layers.Ethernet{
-					SrcMAC:       ifaceAddr,
-					DstMAC:       EthernetBroadcast,
-					EthernetType: layers.EthernetTypeARP,
-				},
-				&layers.ARP{
-					AddrType:          layers.LinkTypeEthernet,
-					Protocol:          layers.EthernetTypeIPv4,
-					HwAddressSize:     6,
-					ProtAddressSize:   4,
-					Operation:         2,
-					SourceHwAddress:   ifaceAddr,
-					SourceProtAddress: network.LocalNode.LanIP.To4(),
-					DstHwAddress:      EthernetBroadcast,
-					DstProtAddress:    network.LocalNode.LanIP.To4(),
-				},
-			))
-			if err := network.writeOutbound(conn, &Outbound{
-				WireData: WireData{
-					Serial: 0,
-					Eth:    buf.Bytes(),
-				},
-			}); err != nil {
-				_ = conn.CloseWrite()
-				return
-			}
-
 			conns = append(conns, conn)
 			trigger(scope.Sub(
 				&conn,
