@@ -89,7 +89,7 @@ func startTCP(
 					Operation:         2,
 					SourceHwAddress:   ifaceAddr,
 					SourceProtAddress: network.LocalNode.LanIP.To4(),
-					DstHwAddress:      ifaceAddr,
+					DstHwAddress:      EthernetBroadcast,
 					DstProtAddress:    network.LocalNode.LanIP.To4(),
 				},
 			))
