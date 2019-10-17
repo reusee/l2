@@ -3,6 +3,7 @@ package l2
 import (
 	"bytes"
 	"encoding/binary"
+	"hash/fnv"
 	"math/rand"
 	"net"
 	"os"
@@ -19,10 +20,11 @@ import (
 )
 
 type Network struct {
-	Network   net.IPNet
-	InitNodes []*Node
-	MTU       int
-	CryptoKey []byte
+	Network      net.IPNet
+	InitNodes    []*Node
+	MTU          int
+	CryptoKey    []byte
+	CryptoKeyInt uint64
 
 	Scope        Scope
 	SelectNode   dyn
@@ -54,6 +56,11 @@ var (
 
 func (n *Network) Start(fns ...dyn) (err error) {
 	defer he(&err)
+
+	// crypto key
+	h := fnv.New64a()
+	h.Write(n.CryptoKey)
+	n.CryptoKeyInt = h.Sum64()
 
 	// get local node
 	var localNode *Node
@@ -326,7 +333,7 @@ func (n *Network) Start(fns ...dyn) (err error) {
 			sn := atomic.AddUint64(&serial, 1)
 			eth := make([]byte, l)
 			copy(eth, bs)
-			preferFormat := WireFormat(0)
+			preferFormat := WireFormat(0) // default
 			if n.PreferFormat != nil {
 				var format WireFormat
 				scope.Call(n.PreferFormat, &format)
@@ -344,7 +351,7 @@ func (n *Network) Start(fns ...dyn) (err error) {
 				PreferFormat: preferFormat,
 			}
 			jobs <- func() {
-				ce(outbound.encode(n.CryptoKey))
+				ce(outbound.encode(n.CryptoKey, n.CryptoKeyInt))
 			}
 			for _, ch := range outboundChans {
 				select {

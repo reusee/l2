@@ -9,8 +9,10 @@ import (
 	"math/rand"
 	"net"
 	"sync"
+	"unsafe"
 
 	"golang.org/x/crypto/chacha20poly1305"
+	"golang.org/x/crypto/poly1305"
 )
 
 type Outbound struct {
@@ -29,6 +31,7 @@ type WireFormat byte
 const (
 	FormatChacha20Poly1305 WireFormat = iota
 	FormatAESGCM
+	FormatChacha20Poly1305Partial
 
 	AESGCMNonceSize = 12
 )
@@ -40,7 +43,7 @@ type Inbound struct {
 }
 
 func (n *Network) writeOutbound(w io.Writer, outbound *Outbound) (err error) {
-	if err = outbound.encode(n.CryptoKey); err != nil {
+	if err = outbound.encode(n.CryptoKey, n.CryptoKeyInt); err != nil {
 		return
 	}
 	if err := binary.Write(w, binary.LittleEndian, uint16(len(outbound.encoded))); err != nil {
@@ -52,7 +55,7 @@ func (n *Network) writeOutbound(w io.Writer, outbound *Outbound) (err error) {
 	return nil
 }
 
-func (outbound *Outbound) encode(key []byte) error {
+func (outbound *Outbound) encode(key []byte, keyInt uint64) error {
 	outbound.encodeOnce.Do(func() {
 		plaintext, err := outbound.WireData.Marshal()
 		if err != nil {
@@ -112,6 +115,27 @@ func (outbound *Outbound) encode(key []byte) error {
 				nil,
 			)
 			buf = buf[:1+chacha20poly1305.NonceSizeX+len(ciphertext)]
+
+		case FormatChacha20Poly1305Partial:
+			// [1] FrameChacha20Poly1305Partial
+			// [32] poly1305 key
+			// [8] 42
+			// [16] poly1305 sum
+			// [v] payload
+			buf = make([]byte, 1+32+8+16+len(plaintext))
+			buf[0] = byte(FormatChacha20Poly1305Partial)
+			binary.LittleEndian.PutUint64(buf[1:9], rand.Uint64())
+			binary.LittleEndian.PutUint64(buf[9:17], rand.Uint64())
+			binary.LittleEndian.PutUint64(buf[17:25], keyInt)
+			binary.LittleEndian.PutUint64(buf[25:33], rand.Uint64())
+			binary.LittleEndian.PutUint64(buf[33:41], 42)
+			poly1305.Sum(
+				(*[16]byte)(unsafe.Pointer(&buf[41])),
+				buf[33:41],
+				(*[32]byte)(unsafe.Pointer(&buf[1])),
+			)
+			binary.LittleEndian.PutUint64(buf[17:25], rand.Uint64())
+			copy(buf[57:], plaintext)
 
 		}
 		outbound.encoded = buf
@@ -173,6 +197,21 @@ func (n *Network) readInbound(r io.Reader) (inbound *Inbound, err error) {
 			err = errBadFrame
 			return
 		}
+
+	case FormatChacha20Poly1305Partial:
+		if len(ciphertext) < 1+32+16+8 {
+			err = errBadFrame
+			return
+		}
+		binary.LittleEndian.PutUint64(ciphertext[17:25], n.CryptoKeyInt)
+		key := (*[32]byte)(unsafe.Pointer(&ciphertext[1]))
+		magic := ciphertext[33:41]
+		sum := (*[16]byte)(unsafe.Pointer(&ciphertext[41]))
+		if !poly1305.Verify(sum, magic, key) {
+			err = errBadFrame
+			return
+		}
+		plaintext = ciphertext[57:]
 
 	}
 
