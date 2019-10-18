@@ -21,6 +21,8 @@ github.com/reusee/dscope v0.0.0-20191011031537-621f80b82680 h1:AE0mBKNHNgPyz11nW
 github.com/reusee/dscope v0.0.0-20191011031537-621f80b82680/go.mod h1:3YStua5Cdi2FJixYwigqIUYhARAZ8fQSTSNZ2ZotVA8=
 github.com/reusee/dscope v0.0.0-20191014210158-144caf3c7165 h1:iBbFOzTDUCQGDRgctnqFSap9W4f5SC0VnPIfvs/8yWw=
 github.com/reusee/dscope v0.0.0-20191014210158-144caf3c7165/go.mod h1:3YStua5Cdi2FJixYwigqIUYhARAZ8fQSTSNZ2ZotVA8=
+github.com/reusee/dscope v0.0.0-20191018091943-8e732cb74adc h1:R5+18d2NEuPLLrzflwHv7QVmDxGAwmCyuIlqe8rqLbg=
+github.com/reusee/dscope v0.0.0-20191018091943-8e732cb74adc/go.mod h1:3YStua5Cdi2FJixYwigqIUYhARAZ8fQSTSNZ2ZotVA8=
 github.com/reusee/e/v2 v2.3.3 h1:/voLHd60okWZ1KEaY4Pln877sbxYQJR2qj48bpWyI0I=
 github.com/reusee/e/v2 v2.3.3/go.mod h1:kykJjxDURd5MAGzB+xkwN7WxfuZaotLjTssHtjpi5LQ=
 github.com/songgao/water v0.0.0-20190725173103-fd331bda3f4b h1:+y4hCMc/WKsDbAPsOQZgBSaSZ26uh2afyaWeVg/3s/c=
