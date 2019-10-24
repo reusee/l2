@@ -2,7 +2,9 @@ package l2
 
 import (
 	"bytes"
+	"encoding/binary"
 	"fmt"
+	"io"
 	"net"
 	"sync"
 	"time"
@@ -159,18 +161,31 @@ func startUDP(
 					), EvUDP, EvUDPConnReadError)
 					return
 				}
-				inbound, err := network.readInbound(bytes.NewReader(bs[:n]))
-				if err != nil {
-					trigger(scope.Sub(
-						&local, &err,
-					), EvUDP, EvUDPReadInboundError)
-					return
+				r := bytes.NewReader(bs[:n])
+				for {
+					var length uint16
+					if err := binary.Read(r, binary.LittleEndian, &length); err != nil {
+						break
+					}
+					inbound, err := network.readInbound(
+						&io.LimitedReader{
+							R: r,
+							N: int64(length),
+						},
+					)
+					if err != nil {
+						trigger(scope.Sub(
+							&local, &err,
+						), EvUDP, EvUDPReadInboundError)
+						return
+					}
+					inbounds <- UDPInbound{
+						RemoteAddr: remoteAddr,
+						Inbound:    inbound,
+						LocalPort:  port,
+					}
 				}
-				inbounds <- UDPInbound{
-					RemoteAddr: remoteAddr,
-					Inbound:    inbound,
-					LocalPort:  port,
-				}
+
 			}
 		})
 
@@ -191,6 +206,51 @@ func startUDP(
 	parser.AddDecodingLayer(&ipv4)
 	parser.AddDecodingLayer(&arp)
 	decoded := make([]gopacket.LayerType, 0, 10)
+
+	type queueKey struct {
+		remote *UDPRemote
+	}
+	type queueValue struct {
+		countDown int
+		length    int
+		datas     [][]byte
+		outbound  *Outbound
+	}
+	const initCountDown = 1
+	queueTicker := time.NewTicker(time.Millisecond * 5)
+	queue := make(map[queueKey]*queueValue)
+	defer queueTicker.Stop()
+	send := func(key queueKey) {
+		value := queue[key]
+		delete(queue, key)
+		buf := new(bytes.Buffer)
+		for _, data := range value.datas {
+			ce(binary.Write(buf, binary.LittleEndian, uint16(len(data))))
+			_, err := buf.Write(data)
+			ce(err)
+		}
+		sent := false
+		for i := len(locals) - 1; i >= 0; i-- {
+			local := locals[i]
+			_, err := local.Conn.WriteToUDP(buf.Bytes(), key.remote.UDPAddr)
+			if err != nil {
+				trigger(scope.Sub(
+					&local, &value.outbound, &key.remote,
+				), EvUDP, EvUDPWriteOutboundError)
+				continue
+			}
+			sent = true
+			trigger(scope.Sub(
+				&local, &value.outbound, &key.remote,
+			), EvUDP, EvUDPOutboundSent)
+			break
+		}
+		if !sent {
+			trigger(scope.Sub(
+				&value.outbound, &remotes,
+			), EvUDP, EvUDPOutboundNotSent)
+		}
+	}
 
 	for {
 		select {
@@ -324,8 +384,6 @@ func startUDP(
 				break
 			}
 
-			sent := false
-
 			for i := len(remotes) - 1; i >= 0; i-- {
 				remote := remotes[i]
 
@@ -368,28 +426,35 @@ func startUDP(
 					continue
 				}
 
-				// send
+				// enqueue
 				buf := new(bytes.Buffer)
 				if err := network.writeOutbound(buf, outbound); err != nil {
 					panic(err)
 				}
-				var local *UDPLocal
-				for i := len(locals) - 1; i >= 0; i-- {
-					local = locals[i]
-					_, err := local.Conn.WriteToUDP(buf.Bytes(), remote.UDPAddr)
-					if err != nil {
-						trigger(scope.Sub(
-							&local, &outbound, &remote,
-						), EvUDP, EvUDPWriteOutboundError)
-						continue
-					}
-					sent = true
-					break
+				data := buf.Bytes()
+				key := queueKey{
+					remote: remote,
 				}
-
-				trigger(scope.Sub(
-					&local, &outbound, &remote,
-				), EvUDP, EvUDPOutboundSent)
+				inQueue, ok := queue[key]
+				if ok {
+					if inQueue.length+len(data) > int(network.MTU) {
+						send(key)
+						queue[key] = &queueValue{
+							countDown: initCountDown,
+							length:    len(data),
+							datas:     [][]byte{data},
+						}
+					} else {
+						inQueue.length += len(data)
+						inQueue.datas = append(inQueue.datas, data)
+					}
+				} else {
+					queue[key] = &queueValue{
+						countDown: initCountDown,
+						length:    len(data),
+						datas:     [][]byte{data},
+					}
+				}
 
 				if ipMatched || addrMatched {
 					break
@@ -397,10 +462,17 @@ func startUDP(
 
 			}
 
-			if !sent {
-				trigger(scope.Sub(
-					&outbound, &remotes,
-				), EvUDP, EvUDPOutboundNotSent)
+		case <-func() <-chan time.Time {
+			if len(queue) > 0 {
+				return queueTicker.C
+			}
+			return nil
+		}():
+			for key, value := range queue {
+				value.countDown--
+				if value.countDown == 0 {
+					send(key)
+				}
 			}
 
 		case <-closing:
