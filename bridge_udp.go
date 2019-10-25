@@ -437,21 +437,21 @@ func startUDP(
 				}
 				inQueue, ok := queue[key]
 				if ok {
-					if inQueue.length+len(data) > int(network.MTU) {
+					if inQueue.length+len(data)+2 > int(network.MTU) {
 						send(key)
 						queue[key] = &queueValue{
 							countDown: initCountDown,
-							length:    len(data),
+							length:    len(data) + 2, // include uint16 length
 							datas:     [][]byte{data},
 						}
 					} else {
-						inQueue.length += len(data)
+						inQueue.length += len(data) + 2
 						inQueue.datas = append(inQueue.datas, data)
 					}
 				} else {
 					queue[key] = &queueValue{
 						countDown: initCountDown,
-						length:    len(data),
+						length:    len(data) + 2,
 						datas:     [][]byte{data},
 					}
 				}
