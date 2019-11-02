@@ -1,6 +1,7 @@
 package l2
 
 import (
+	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
 	"encoding/binary"
@@ -11,9 +12,15 @@ import (
 	"sync"
 	"unsafe"
 
+	"github.com/reusee/sb"
 	"golang.org/x/crypto/chacha20poly1305"
 	"golang.org/x/crypto/poly1305"
 )
+
+type WireData struct {
+	Eth    []byte
+	Serial uint64
+}
 
 type Outbound struct {
 	WireData
@@ -57,11 +64,12 @@ func (n *Network) writeOutbound(w io.Writer, outbound *Outbound) (err error) {
 
 func (outbound *Outbound) encode(key []byte, keyInt uint64) error {
 	outbound.encodeOnce.Do(func() {
-		plaintext, err := outbound.WireData.Marshal()
-		if err != nil {
+		out := new(bytes.Buffer)
+		if err := sb.Encode(out, sb.NewMarshaler(outbound.WireData)); err != nil {
 			outbound.err = err
 			return
 		}
+		plaintext := out.Bytes()
 
 		var buf []byte
 		switch outbound.PreferFormat {
@@ -216,7 +224,7 @@ func (n *Network) readInbound(r io.Reader) (inbound *Inbound, err error) {
 	}
 
 	inbound = new(Inbound)
-	if err = inbound.WireData.Unmarshal(plaintext); err != nil {
+	if err = sb.Unmarshal(sb.NewDecoder(bytes.NewReader(plaintext)), &inbound.WireData); err != nil {
 		return
 	}
 
