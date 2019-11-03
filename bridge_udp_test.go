@@ -33,7 +33,7 @@ func TestPingPongAllInitNodesUDP(t *testing.T) {
 					Mask: net.CIDRMask(24, 32),
 				},
 				InitNodes: nodes,
-				MTU:       1345,
+				MTU:       testMTU,
 				CryptoKey: testCryptoKey,
 				SelectNode: func() *Node {
 					return node1
@@ -47,7 +47,7 @@ func TestPingPongAllInitNodesUDP(t *testing.T) {
 					Mask: net.CIDRMask(24, 32),
 				},
 				InitNodes: nodes,
-				MTU:       1345,
+				MTU:       testMTU,
 				CryptoKey: testCryptoKey,
 				SelectNode: func() *Node {
 					return node2
@@ -74,7 +74,7 @@ func TestPingPongOneRandomNodeUDP(t *testing.T) {
 					Mask: net.CIDRMask(24, 32),
 				},
 				InitNodes: nodes,
-				MTU:       1345,
+				MTU:       testMTU,
 				CryptoKey: testCryptoKey,
 				SelectNode: func() *Node {
 					return node1
@@ -88,7 +88,7 @@ func TestPingPongOneRandomNodeUDP(t *testing.T) {
 					Mask: net.CIDRMask(24, 32),
 				},
 				InitNodes: nodes,
-				MTU:       1345,
+				MTU:       testMTU,
 				CryptoKey: testCryptoKey,
 			}
 		},
@@ -115,7 +115,7 @@ func BenchmarkUDP(b *testing.B) {
 			Mask: net.CIDRMask(24, 32),
 		},
 		InitNodes: nodes,
-		MTU:       1345,
+		MTU:       testMTU,
 		CryptoKey: testCryptoKey,
 		SelectNode: func() *Node {
 			return node1
@@ -127,7 +127,7 @@ func BenchmarkUDP(b *testing.B) {
 			Mask: net.CIDRMask(24, 32),
 		},
 		InitNodes: nodes,
-		MTU:       1345,
+		MTU:       testMTU,
 		CryptoKey: testCryptoKey,
 		SelectNode: func() *Node {
 			return node2

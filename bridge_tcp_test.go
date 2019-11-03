@@ -27,7 +27,7 @@ func TestPingPongAllInitNodesTCP(t *testing.T) {
 					Mask: net.CIDRMask(24, 32),
 				},
 				InitNodes: nodes,
-				MTU:       1345,
+				MTU:       testMTU,
 				CryptoKey: testCryptoKey,
 				SelectNode: func() *Node {
 					return node1
@@ -41,7 +41,7 @@ func TestPingPongAllInitNodesTCP(t *testing.T) {
 					Mask: net.CIDRMask(24, 32),
 				},
 				InitNodes: nodes,
-				MTU:       1345,
+				MTU:       testMTU,
 				CryptoKey: testCryptoKey,
 				SelectNode: func() *Node {
 					return node2
@@ -68,7 +68,7 @@ func TestPingPongOneRandomNodeTCP(t *testing.T) {
 					Mask: net.CIDRMask(24, 32),
 				},
 				InitNodes: nodes,
-				MTU:       1345,
+				MTU:       testMTU,
 				CryptoKey: testCryptoKey,
 				SelectNode: func() *Node {
 					return node1
@@ -82,7 +82,7 @@ func TestPingPongOneRandomNodeTCP(t *testing.T) {
 					Mask: net.CIDRMask(24, 32),
 				},
 				InitNodes: nodes,
-				MTU:       1345,
+				MTU:       testMTU,
 				CryptoKey: testCryptoKey,
 			}
 		},

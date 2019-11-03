@@ -14,6 +14,7 @@ import (
 
 var (
 	testCryptoKey = []byte("12345678901234567890123456789012")
+	testMTU       = 300
 )
 
 func testPingPong(
@@ -103,7 +104,7 @@ connect:
 	}
 	ce(err)
 	var s string
-	for i := 0; i < 1024; i++ {
+	for i := 0; i < 128; i++ {
 		input := strings.Repeat("foobar", i)
 		ce(json.NewEncoder(conn).Encode(input))
 		ce(json.NewDecoder(conn).Decode(&s))
