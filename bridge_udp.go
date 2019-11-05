@@ -218,6 +218,7 @@ func startUDP(
 	}
 	const initCountDown = 1
 	queueTimer := time.NewTimer(time.Millisecond * 5)
+	queueTimerStarted := true
 	queue := make(map[queueKey]*queueValue)
 	send := func(key queueKey) {
 		value := queue[key]
@@ -426,15 +427,6 @@ func startUDP(
 				}
 
 				// enqueue
-				if len(queue) == 0 {
-					if !queueTimer.Stop() {
-						select {
-						case <-queueTimer.C:
-						default:
-						}
-					}
-					queueTimer.Reset(time.Millisecond * 5)
-				}
 				buf := new(bytes.Buffer)
 				if err := network.writeOutbound(buf, outbound); err != nil {
 					panic(err)
@@ -470,6 +462,17 @@ func startUDP(
 
 			}
 
+			if len(queue) > 0 && !queueTimerStarted {
+				if !queueTimer.Stop() {
+					select {
+					case <-queueTimer.C:
+					default:
+					}
+				}
+				queueTimer.Reset(time.Millisecond * 5)
+				queueTimerStarted = true
+			}
+
 		case <-queueTimer.C:
 			for key, value := range queue {
 				value.countDown--
@@ -477,6 +480,7 @@ func startUDP(
 					send(key)
 				}
 			}
+			queueTimerStarted = false
 
 		case <-closing:
 			for _, local := range locals {
