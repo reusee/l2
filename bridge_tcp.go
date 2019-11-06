@@ -21,8 +21,9 @@ type TCPListener struct {
 type TCPConn struct {
 	sync.RWMutex
 	*net.TCPConn
-	IPs   []net.IP
-	Addrs []net.HardwareAddr
+	closeOnce sync.Once
+	IPs       []net.IP
+	Addrs     []net.HardwareAddr
 }
 
 func startTCP(
@@ -111,7 +112,9 @@ func startTCP(
 				trigger(scope.Sub(
 					&conn, &err,
 				), EvTCP, EvTCPReadInboundError)
-				_ = conn.CloseRead()
+				conn.closeOnce.Do(func() {
+					conn.Close()
+				})
 				select {
 				case <-closing:
 				default:
@@ -389,7 +392,9 @@ func startTCP(
 
 				// send
 				if err := network.writeOutbound(conn, outbound); err != nil {
-					_ = conn.CloseWrite()
+					conn.closeOnce.Do(func() {
+						conn.Close()
+					})
 					trigger(scope.Sub(
 						&conn, &outbound, &err,
 					), EvTCP, EvTCPWriteOutboundError)
