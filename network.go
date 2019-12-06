@@ -153,8 +153,24 @@ func (n *Network) Start(fns ...dyn) (err error) {
 	// utils
 	var getTime = func() func() time.Time {
 		servers := []string{
+
 			"time.cloudflare.com",
+			"162.159.200.1",
+			"162.159.200.123",
+
 			"cn.ntp.org.cn",
+			"58.220.133.132",
+			"114.118.7.163",
+			"223.113.120.194",
+			"114.118.7.161",
+			"223.113.97.104",
+			"120.25.115.20",
+			"120.25.108.11",
+			"203.107.6.88",
+			"182.92.12.11",
+			"119.177.128.146",
+			"118.24.195.65",
+
 			"ntp6a.rollernet.us",
 			"time.google.com",
 		}
