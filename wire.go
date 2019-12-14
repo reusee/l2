@@ -12,6 +12,7 @@ import (
 	"sync"
 	"unsafe"
 
+	"github.com/golang/snappy"
 	"github.com/reusee/sb"
 	"golang.org/x/crypto/chacha20poly1305"
 	"golang.org/x/crypto/poly1305"
@@ -64,12 +65,14 @@ func (n *Network) writeOutbound(w io.Writer, outbound *Outbound) (err error) {
 
 func (outbound *Outbound) encode(key []byte, keyInt uint64) error {
 	outbound.encodeOnce.Do(func() {
-		out := new(bytes.Buffer)
+		bs := new(bytes.Buffer)
+		out := snappy.NewBufferedWriter(bs)
 		if err := sb.Encode(out, sb.NewMarshaler(outbound.WireData)); err != nil {
 			outbound.err = err
 			return
 		}
-		plaintext := out.Bytes()
+		ce(out.Close())
+		plaintext := bs.Bytes()
 
 		var buf []byte
 		switch outbound.PreferFormat {
@@ -224,7 +227,7 @@ func (n *Network) readInbound(r io.Reader) (inbound *Inbound, err error) {
 	}
 
 	inbound = new(Inbound)
-	if err = sb.Unmarshal(sb.NewDecoder(bytes.NewReader(plaintext)), &inbound.WireData); err != nil {
+	if err = sb.Unmarshal(sb.NewDecoder(snappy.NewReader(bytes.NewReader(plaintext))), &inbound.WireData); err != nil {
 		return
 	}
 

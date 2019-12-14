@@ -4,6 +4,7 @@ go 1.13
 
 require (
 	github.com/beevik/ntp v0.2.0
+	github.com/golang/snappy v0.0.1
 	github.com/google/gopacket v1.1.18-0.20190926102631-33810c487ced
 	github.com/reusee/dscope v0.0.0-20191018105111-7ecfb7afe792
 	github.com/reusee/e/v2 v2.3.3
