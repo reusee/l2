@@ -67,7 +67,10 @@ func (outbound *Outbound) encode(key []byte, keyInt uint64) error {
 	outbound.encodeOnce.Do(func() {
 		bs := new(bytes.Buffer)
 		out := snappy.NewBufferedWriter(bs)
-		if err := sb.Encode(out, sb.NewMarshaler(outbound.WireData)); err != nil {
+		if err := sb.Copy(
+			sb.Marshal(outbound.WireData),
+			sb.Encode(out),
+		); err != nil {
 			outbound.err = err
 			return
 		}
@@ -227,7 +230,10 @@ func (n *Network) readInbound(r io.Reader) (inbound *Inbound, err error) {
 	}
 
 	inbound = new(Inbound)
-	if err = sb.Unmarshal(sb.NewDecoder(snappy.NewReader(bytes.NewReader(plaintext))), &inbound.WireData); err != nil {
+	if err = sb.Copy(
+		sb.Decode(snappy.NewReader(bytes.NewReader(plaintext))),
+		sb.Unmarshal(&inbound.WireData),
+	); err != nil {
 		return
 	}
 

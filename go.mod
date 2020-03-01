@@ -8,7 +8,7 @@ require (
 	github.com/google/gopacket v1.1.18-0.20190926102631-33810c487ced
 	github.com/reusee/dscope v0.0.0-20200228021715-7d32b4bb7ea9
 	github.com/reusee/e/v2 v2.3.3
-	github.com/reusee/sb v0.0.0-20200301052339-42c2ebaf5327
+	github.com/reusee/sb v0.0.0-20200301115035-64a17cb1844a
 	github.com/songgao/water v0.0.0-20190725173103-fd331bda3f4b
 	github.com/stretchr/testify v1.4.0 // indirect
 	github.com/vishvananda/netlink v1.1.0

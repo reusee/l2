@@ -32,6 +32,8 @@ github.com/reusee/sb v0.0.0-20200224171110-bdd8d75a4974 h1:+kh+wEg08KF6gFRJp0Q8I
 github.com/reusee/sb v0.0.0-20200224171110-bdd8d75a4974/go.mod h1:X2132bhIwkn1fc+usHN65wrj+uym0XCF8ZeG1NYAAgo=
 github.com/reusee/sb v0.0.0-20200301052339-42c2ebaf5327 h1:WbF2rFGwW3flG63MIvcXe89dZfa+4MBZ5jsrmwMT1+Y=
 github.com/reusee/sb v0.0.0-20200301052339-42c2ebaf5327/go.mod h1:X2132bhIwkn1fc+usHN65wrj+uym0XCF8ZeG1NYAAgo=
+github.com/reusee/sb v0.0.0-20200301115035-64a17cb1844a h1:dmXRRKkdQCJvy8Ibq8qMXVmbTGyY8g5jgR5bLrvrexE=
+github.com/reusee/sb v0.0.0-20200301115035-64a17cb1844a/go.mod h1:X2132bhIwkn1fc+usHN65wrj+uym0XCF8ZeG1NYAAgo=
 github.com/songgao/water v0.0.0-20190725173103-fd331bda3f4b h1:+y4hCMc/WKsDbAPsOQZgBSaSZ26uh2afyaWeVg/3s/c=
 github.com/songgao/water v0.0.0-20190725173103-fd331bda3f4b/go.mod h1:P5HUIBuIWKbyjl083/loAegFkfbFNx5i2qEP4CNbm7E=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
