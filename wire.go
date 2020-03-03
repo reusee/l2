@@ -68,7 +68,10 @@ func (outbound *Outbound) encode(key []byte, keyInt uint64) error {
 		bs := new(bytes.Buffer)
 		out := snappy.NewBufferedWriter(bs)
 		if err := sb.Copy(
-			sb.Marshal(outbound.WireData),
+			sb.Marshal(sb.Tuple{
+				outbound.WireData.Eth,
+				outbound.WireData.Serial,
+			}),
 			sb.Encode(out),
 		); err != nil {
 			outbound.err = err
@@ -232,7 +235,10 @@ func (n *Network) readInbound(r io.Reader) (inbound *Inbound, err error) {
 	inbound = new(Inbound)
 	if err = sb.Copy(
 		sb.Decode(snappy.NewReader(bytes.NewReader(plaintext))),
-		sb.Unmarshal(&inbound.WireData),
+		sb.Unmarshal(func(bs []byte, serial uint64) {
+			inbound.WireData.Eth = bs
+			inbound.WireData.Serial = serial
+		}),
 	); err != nil {
 		return
 	}
