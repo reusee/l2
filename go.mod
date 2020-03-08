@@ -6,7 +6,7 @@ require (
 	github.com/beevik/ntp v0.2.0
 	github.com/golang/snappy v0.0.1
 	github.com/google/gopacket v1.1.18-0.20190926102631-33810c487ced
-	github.com/reusee/dscope v0.0.0-20200228021715-7d32b4bb7ea9
+	github.com/reusee/dscope v0.0.0-20200308104333-145d25e52203
 	github.com/reusee/e/v2 v2.3.3
 	github.com/reusee/sb v0.0.0-20200303143308-56f91e7239a1
 	github.com/songgao/water v0.0.0-20190725173103-fd331bda3f4b

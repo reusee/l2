@@ -14,6 +14,8 @@ github.com/reusee/dscope v0.0.0-20191018105111-7ecfb7afe792 h1:4leDLaQ9bcs6EOIIq
 github.com/reusee/dscope v0.0.0-20191018105111-7ecfb7afe792/go.mod h1:3YStua5Cdi2FJixYwigqIUYhARAZ8fQSTSNZ2ZotVA8=
 github.com/reusee/dscope v0.0.0-20200228021715-7d32b4bb7ea9 h1:sFedu0oXKZKNouhNed78z488mJzEa0jsYtC5eLnPILM=
 github.com/reusee/dscope v0.0.0-20200228021715-7d32b4bb7ea9/go.mod h1:3YStua5Cdi2FJixYwigqIUYhARAZ8fQSTSNZ2ZotVA8=
+github.com/reusee/dscope v0.0.0-20200308104333-145d25e52203 h1:yaI2M9J33wR0JBXGShHtxy5kVQD2b6aE8reZNfNQT3g=
+github.com/reusee/dscope v0.0.0-20200308104333-145d25e52203/go.mod h1:3YStua5Cdi2FJixYwigqIUYhARAZ8fQSTSNZ2ZotVA8=
 github.com/reusee/e/v2 v2.3.3 h1:/voLHd60okWZ1KEaY4Pln877sbxYQJR2qj48bpWyI0I=
 github.com/reusee/e/v2 v2.3.3/go.mod h1:kykJjxDURd5MAGzB+xkwN7WxfuZaotLjTssHtjpi5LQ=
 github.com/reusee/sb v0.0.0-20191102062618-aeeec29a62ce h1:/Als6k8Ts5PQf8IeHGwLCab2x/Sc0k0CkKwob3OKel4=
