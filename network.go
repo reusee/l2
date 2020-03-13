@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"hash/fnv"
+	"io"
 	"math/rand"
 	"net"
 	"os"
@@ -16,8 +17,12 @@ import (
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/reusee/dscope"
-	"github.com/songgao/water"
 )
+
+type Interface interface {
+	io.ReadWriteCloser
+	Name() string
+}
 
 type Network struct {
 	Network      net.IPNet
@@ -35,7 +40,7 @@ type Network struct {
 	LocalNode *Node
 
 	nodes     atomic.Value
-	iface     *water.Interface
+	iface     Interface
 	closing   chan struct{}
 	waitClose sync.WaitGroup
 	closeOnce sync.Once
