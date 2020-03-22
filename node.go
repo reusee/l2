@@ -9,6 +9,7 @@ type Node struct {
 	WanHost     string // reachable from anywhere
 	PrivateIP   net.IP // reachable from local lan
 	BridgeNames []string
+	ID          int // to allow multiple nodes in single host
 
 	wanIP    net.IP
 	lanIPStr string

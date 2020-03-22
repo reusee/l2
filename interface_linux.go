@@ -1,6 +1,7 @@
 package l2
 
 import (
+	"fmt"
 	"net"
 
 	"github.com/songgao/water"
@@ -12,7 +13,7 @@ func (n *Network) SetupInterface() {
 	iface, err := water.New(water.Config{
 		DeviceType: interfaceType,
 		PlatformSpecificParams: water.PlatformSpecificParams{
-			Name:       "L2-" + n.LocalNode.LanIP.String(),
+			Name:       fmt.Sprintf("L2-%s-%d", n.LocalNode.LanIP.String(), n.LocalNode.ID),
 			MultiQueue: true,
 		},
 	})

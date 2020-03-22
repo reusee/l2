@@ -13,8 +13,9 @@ func TestPingPongAllInitNodesTCP(t *testing.T) {
 	}
 	node2 := &Node{
 		LanIP:       net.IPv4(192, 168, 244, 2),
-		WanHost:     "127.0.0.1",
+		WanHost:     "localhost",
 		BridgeNames: []string{"TCP"},
+		ID:          2,
 	}
 	nodes := []*Node{
 		node1, node2,

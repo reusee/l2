@@ -3,13 +3,10 @@ package l2
 import (
 	"encoding/json"
 	"net"
-	"runtime"
 	"strings"
 	"sync"
 	"testing"
 	"time"
-
-	"github.com/vishvananda/netns"
 )
 
 var (
@@ -34,16 +31,8 @@ func testPingPong(
 	ok1 := make(chan struct{})
 	var network1 *Network
 	go func() {
-		runtime.LockOSThread()
-		ns0, err := netns.Get()
-		ce(err)
-		_ = ns0
-		ns1, err := netns.New()
-		ce(err)
-		_ = ns1
-
 		network1 = getNetwork1()
-		err = network1.Start()
+		err := network1.Start()
 		ce(err)
 		if !network1.Network.Contains(network1.LocalNode.LanIP) {
 			panic("fail")

@@ -28,9 +28,15 @@ func shiftingPort(
 		if t != info.Time {
 			// shift
 			f := fnv.New64a()
-			fmt.Fprintf(f, "%s-%s-%d",
-				kind, node.lanIPStr, t.Unix(),
-			)
+			if node.ID > 0 {
+				fmt.Fprintf(f, "%s-%s-%d-%d",
+					kind, node.lanIPStr, node.ID, t.Unix(),
+				)
+			} else {
+				fmt.Fprintf(f, "%s-%s-%d",
+					kind, node.lanIPStr, t.Unix(),
+				)
+			}
 			port := 10000 + f.Sum64()%45000
 			info.Time = t
 			info.Port = int(port)
