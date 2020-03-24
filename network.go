@@ -70,9 +70,11 @@ func (n *Network) Start(fns ...dyn) (err error) {
 	// get local node
 	var localNode *Node
 	if n.SelectNode != nil {
-		addrs, err := net.InterfaceAddrs()
+		var addrs []net.Addr
+		addrs, err = net.InterfaceAddrs()
 		ce(err, "get interface addrs")
-		hostname, err := os.Hostname()
+		var hostname string
+		hostname, err = os.Hostname()
 		ce(err, "get host name")
 		dscope.New(
 			func() (
@@ -135,7 +137,8 @@ func (n *Network) Start(fns ...dyn) (err error) {
 	ifaces, err := net.Interfaces()
 	ce(err)
 	for _, iface := range ifaces {
-		addrs, err := iface.Addrs()
+		var addrs []net.Addr
+		addrs, err = iface.Addrs()
 		ce(err)
 		ifaceAddrs = append(ifaceAddrs, addrs...)
 	}
