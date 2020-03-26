@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"math/rand"
 	"net"
 	"strconv"
 	"sync"
@@ -21,9 +22,10 @@ type TCPListener struct {
 type TCPConn struct {
 	sync.RWMutex
 	*net.TCPConn
-	closeOnce sync.Once
-	IPs       []net.IP
-	Addrs     []net.HardwareAddr
+	closeOnce   sync.Once
+	IPs         []net.IP
+	Addrs       []net.HardwareAddr
+	WillCloseAt time.Time
 }
 
 func startTCP(
@@ -261,7 +263,8 @@ func startTCP(
 									return
 								}
 								conn := &TCPConn{
-									TCPConn: netConn.(*net.TCPConn),
+									TCPConn:     netConn.(*net.TCPConn),
+									WillCloseAt: time.Now().Add(connDuration),
 								}
 								addConn(conn)
 								readConn(conn)
@@ -319,6 +322,7 @@ func startTCP(
 								IPs: []net.IP{
 									node.LanIP,
 								},
+								WillCloseAt: time.Now().Add(connDuration),
 							}
 							trigger(scope.Sub(
 								&conn, &node.LanIP,
@@ -352,14 +356,13 @@ func startTCP(
 			}
 
 			sent := false
+			var candidates []*TCPConn
 
 			for i := len(conns) - 1; i >= 0; i-- {
 				conn := conns[i]
 
 				// filter
 				skip := false
-				ipMatched := false
-				addrMatched := false
 				conn.RLock()
 				if len(conn.Addrs) == 0 && len(conn.IPs) == 0 {
 					skip = true
@@ -374,8 +377,6 @@ func startTCP(
 					}
 					if !ok {
 						skip = true
-					} else {
-						ipMatched = true
 					}
 				}
 				if outbound.DestAddr != nil && len(conn.Addrs) > 0 {
@@ -388,8 +389,6 @@ func startTCP(
 					}
 					if !ok {
 						skip = true
-					} else {
-						addrMatched = true
 					}
 				}
 				conn.RUnlock()
@@ -397,28 +396,31 @@ func startTCP(
 					continue
 				}
 
-				// send
-				if err := network.writeOutbound(conn, outbound); err != nil {
-					conn.closeOnce.Do(func() {
-						conn.Close()
-					})
-					trigger(scope.Sub(
-						&conn, &outbound, &err,
-					), EvTCP, EvTCPWriteOutboundError)
-					deleteConn(conn)
+				if time.Until(conn.WillCloseAt) < time.Second*2 {
 					continue
 				}
-				sent = true
 
-				trigger(scope.Sub(
-					&conn, &outbound,
-				), EvTCP, EvTCPOutboundSent)
-
-				if ipMatched || addrMatched {
-					break
-				}
+				candidates = append(candidates, conn)
 
 			}
+
+			conn := candidates[rand.Intn(len(candidates))]
+			// send
+			if err := network.writeOutbound(conn, outbound); err != nil {
+				conn.closeOnce.Do(func() {
+					conn.Close()
+				})
+				trigger(scope.Sub(
+					&conn, &outbound, &err,
+				), EvTCP, EvTCPWriteOutboundError)
+				deleteConn(conn)
+				continue
+			}
+			sent = true
+
+			trigger(scope.Sub(
+				&conn, &outbound,
+			), EvTCP, EvTCPOutboundSent)
 
 			if !sent {
 				trigger(scope.Sub(

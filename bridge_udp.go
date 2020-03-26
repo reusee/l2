@@ -55,7 +55,7 @@ func startUDP(
 
 	getPorts := shiftingPorts(
 		fmt.Sprintf("%x-udp-", network.CryptoKey),
-		19,
+		1,
 		portShiftInterval,
 	)
 
