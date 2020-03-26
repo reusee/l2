@@ -53,8 +53,9 @@ func startUDP(
 	localConnDuration := portShiftInterval * 2
 	remoteDuration := portShiftInterval * 3
 
-	getPort := shiftingPort(
+	getPorts := shiftingPorts(
 		fmt.Sprintf("%x-udp-", network.CryptoKey),
+		19,
 		portShiftInterval,
 	)
 
@@ -95,30 +96,33 @@ func startUDP(
 
 			node := node
 			now := getTime()
-			remotePort := getPort(node, now)
-			udpAddr := &net.UDPAddr{
-				IP:   ip,
-				Port: remotePort,
-			}
-			udpAddrStr := udpAddr.String()
-			for _, remote := range remotes {
-				if remote.UDPAddrStr == udpAddrStr {
-					continue loop_nodes
+			remotePorts := getPorts(node, now)
+			for _, remotePort := range remotePorts {
+				remotePort := remotePort
+				udpAddr := &net.UDPAddr{
+					IP:   ip,
+					Port: remotePort,
 				}
-			}
+				udpAddrStr := udpAddr.String()
+				for _, remote := range remotes {
+					if remote.UDPAddrStr == udpAddrStr {
+						continue loop_nodes
+					}
+				}
 
-			remote := &UDPRemote{
-				UDPAddr:    udpAddr,
-				UDPAddrStr: udpAddrStr,
-				AddedAt:    now,
-				IPs: []net.IP{
-					node.LanIP,
-				},
+				remote := &UDPRemote{
+					UDPAddr:    udpAddr,
+					UDPAddrStr: udpAddrStr,
+					AddedAt:    now,
+					IPs: []net.IP{
+						node.LanIP,
+					},
+				}
+				remotes = append(remotes, remote)
+				trigger(scope.Sub(
+					&remote,
+				), EvUDP, EvUDPRemoteAdded)
 			}
-			remotes = append(remotes, remote)
-			trigger(scope.Sub(
-				&remote,
-			), EvUDP, EvUDPRemoteAdded)
 
 		}
 	}
@@ -190,7 +194,9 @@ func startUDP(
 		})
 
 	}
-	addLocal(getPort(network.LocalNode, getTime().Add(time.Second)))
+	for _, port := range getPorts(network.LocalNode, getTime().Add(time.Second)) {
+		addLocal(port)
+	}
 
 	close(ready)
 	trigger(scope, EvUDP, EvUDPReady)
@@ -258,7 +264,9 @@ func startUDP(
 		case <-refreshConnsTicker.C:
 			now := getTime()
 			// add local conn
-			addLocal(getPort(network.LocalNode, getTime().Add(time.Second)))
+			for _, port := range getPorts(network.LocalNode, getTime().Add(time.Second)) {
+				addLocal(port)
+			}
 			// delete local conn
 			for i := 0; i < len(locals); {
 				local := locals[i]
