@@ -32,9 +32,8 @@ const (
 	EvUDPRemoteGotAddr
 	EvUDPRemoteGotIP
 	EvUDPInboundSent
-	EvUDPWriteOutboundError
-	EvUDPOutboundSent
-	EvUDPOutboundNotSent
+	EvUDPWriteError
+	EvUDPNotSent
 	EvUDPClosed
 
 	EvNetwork

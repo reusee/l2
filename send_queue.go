@@ -24,7 +24,6 @@ type queueValue struct {
 	countDown int
 	length    int
 	datas     [][]byte
-	outbound  *Outbound
 }
 
 func newSendQueue(

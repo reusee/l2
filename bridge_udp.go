@@ -218,20 +218,17 @@ func startUDP(
 			_, err := local.Conn.WriteToUDP(data, key.remote.UDPAddr)
 			if err != nil {
 				trigger(scope.Sub(
-					&local, &value.outbound, &key.remote,
-				), EvUDP, EvUDPWriteOutboundError)
+					&local, &key.remote,
+				), EvUDP, EvUDPWriteError)
 				continue
 			}
 			sent = true
-			trigger(scope.Sub(
-				&local, &value.outbound, &key.remote,
-			), EvUDP, EvUDPOutboundSent)
 			break
 		}
 		if !sent {
 			trigger(scope.Sub(
-				&value.outbound, &remotes,
-			), EvUDP, EvUDPOutboundNotSent)
+				&key.remote, &remotes,
+			), EvUDP, EvUDPNotSent)
 		}
 	}
 	queue := newSendQueue(network, sendFunc)
