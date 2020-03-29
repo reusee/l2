@@ -207,32 +207,15 @@ func startUDP(
 	parser.AddDecodingLayer(&arp)
 	decoded := make([]gopacket.LayerType, 0, 10)
 
-	type queueKey struct {
+	type queueK struct {
 		remote *UDPRemote
 	}
-	type queueValue struct {
-		countDown int
-		length    int
-		datas     [][]byte
-		outbound  *Outbound
-	}
-	const initCountDown = 1
-	queueTimer := time.NewTimer(time.Millisecond * 5)
-	queueTimerStarted := true
-	queue := make(map[queueKey]*queueValue)
-	send := func(key queueKey) {
-		value := queue[key]
-		delete(queue, key)
-		buf := new(bytes.Buffer)
-		for _, data := range value.datas {
-			ce(binary.Write(buf, binary.LittleEndian, uint16(len(data))))
-			_, err := buf.Write(data)
-			ce(err)
-		}
+	sendFunc := func(k queueKey, value *queueValue, data []byte) {
+		key := k.(queueK)
 		sent := false
 		for i := len(locals) - 1; i >= 0; i-- {
 			local := locals[i]
-			_, err := local.Conn.WriteToUDP(buf.Bytes(), key.remote.UDPAddr)
+			_, err := local.Conn.WriteToUDP(data, key.remote.UDPAddr)
 			if err != nil {
 				trigger(scope.Sub(
 					&local, &value.outbound, &key.remote,
@@ -251,6 +234,7 @@ func startUDP(
 			), EvUDP, EvUDPOutboundNotSent)
 		}
 	}
+	queue := newSendQueue(network, sendFunc)
 
 	for {
 		select {
@@ -426,35 +410,9 @@ func startUDP(
 					continue
 				}
 
-				// enqueue
-				buf := new(bytes.Buffer)
-				if err := network.writeOutbound(buf, outbound); err != nil {
-					panic(err)
-				}
-				data := buf.Bytes()
-				key := queueKey{
+				queue.enqueue(queueK{
 					remote: remote,
-				}
-				inQueue, ok := queue[key]
-				if ok {
-					if inQueue.length+len(data)+2 > int(network.MTU) {
-						send(key)
-						queue[key] = &queueValue{
-							countDown: initCountDown,
-							length:    len(data) + 2, // include uint16 length
-							datas:     [][]byte{data},
-						}
-					} else {
-						inQueue.length += len(data) + 2
-						inQueue.datas = append(inQueue.datas, data)
-					}
-				} else {
-					queue[key] = &queueValue{
-						countDown: initCountDown,
-						length:    len(data) + 2,
-						datas:     [][]byte{data},
-					}
-				}
+				}, outbound)
 
 				if ipMatched || addrMatched {
 					break
@@ -462,25 +420,8 @@ func startUDP(
 
 			}
 
-			if len(queue) > 0 && !queueTimerStarted {
-				if !queueTimer.Stop() {
-					select {
-					case <-queueTimer.C:
-					default:
-					}
-				}
-				queueTimer.Reset(time.Millisecond * 5)
-				queueTimerStarted = true
-			}
-
-		case <-queueTimer.C:
-			for key, value := range queue {
-				value.countDown--
-				if value.countDown == 0 {
-					send(key)
-				}
-			}
-			queueTimerStarted = false
+		case <-queue.timer.C:
+			queue.tick()
 
 		case <-closing:
 			for _, local := range locals {
