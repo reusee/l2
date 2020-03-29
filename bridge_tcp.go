@@ -3,7 +3,9 @@ package l2
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"fmt"
+	"io"
 	"net"
 	"strconv"
 	"sync"
@@ -106,7 +108,16 @@ func startTCP(
 		decoded := make([]gopacket.LayerType, 0, 10)
 
 		for {
-			inbound, err := network.readInbound(conn)
+			var length uint16
+			if err := binary.Read(conn, binary.LittleEndian, &length); err != nil {
+				break
+			}
+			inbound, err := network.readInbound(
+				&io.LimitedReader{
+					R: conn,
+					N: int64(length),
+				},
+			)
 
 			if err != nil {
 				trigger(scope.Sub(
@@ -336,13 +347,18 @@ func startTCP(
 	close(ready)
 	trigger(scope, EvTCP, EvTCPReady)
 
-	for {
-		select {
-
-		case outbound := <-outboundCh:
-			if outbound == nil {
-				break
-			}
+	type qKey struct {
+		IPLen   int
+		IP      [16]byte
+		HasAddr bool
+		Addr    [6]byte
+	}
+	queue := newSendQueue(
+		network,
+		func(k queueKey, value *queueValue, data []byte) {
+			key := k.(qKey)
+			ip := net.IP(key.IP[:key.IPLen])
+			addr := net.HardwareAddr(key.Addr[:])
 
 			sent := false
 
@@ -357,10 +373,10 @@ func startTCP(
 				if len(conn.Addrs) == 0 && len(conn.IPs) == 0 {
 					skip = true
 				}
-				if outbound.DestIP != nil && len(conn.IPs) > 0 {
+				if key.IPLen > 0 && len(conn.IPs) > 0 {
 					ok := false
-					for _, ip := range conn.IPs {
-						if ip.Equal(*outbound.DestIP) {
+					for _, connIP := range conn.IPs {
+						if connIP.Equal(ip) {
 							ok = true
 							break
 						}
@@ -371,10 +387,10 @@ func startTCP(
 						ipMatched = true
 					}
 				}
-				if outbound.DestAddr != nil && len(conn.Addrs) > 0 {
+				if key.HasAddr && len(conn.Addrs) > 0 {
 					ok := false
-					for _, addr := range conn.Addrs {
-						if bytes.Equal(addr, *outbound.DestAddr) {
+					for _, connAddr := range conn.Addrs {
+						if bytes.Equal(connAddr, addr) {
 							ok = true
 							break
 						}
@@ -391,7 +407,7 @@ func startTCP(
 				}
 
 				// send
-				if err := network.writeOutbound(conn, outbound); err != nil {
+				if _, err := conn.Write(data); err != nil {
 					conn.closeOnce.Do(func() {
 						conn.Close()
 					})
@@ -401,6 +417,7 @@ func startTCP(
 					deleteConn(conn)
 					continue
 				}
+
 				sent = true
 
 				if ipMatched || addrMatched {
@@ -414,6 +431,26 @@ func startTCP(
 					&conns,
 				), EvTCP, EvTCPNotSent)
 			}
+		},
+	)
+
+	for {
+		select {
+
+		case outbound := <-outboundCh:
+			if outbound == nil {
+				break
+			}
+			var key qKey
+			if outbound.DestIP != nil {
+				key.IPLen = len(*outbound.DestIP)
+				copy(key.IP[:], *outbound.DestIP)
+			}
+			if outbound.DestAddr != nil {
+				key.HasAddr = true
+				copy(key.Addr[:], *outbound.DestAddr)
+			}
+			queue.enqueue(key, outbound)
 
 		case <-refreshConnsTicker.C:
 			refreshConns()
@@ -429,6 +466,9 @@ func startTCP(
 					), EvTCP, EvTCPListenerClosed)
 				}
 			}
+
+		case <-queue.timer.C:
+			queue.tick()
 
 		case fn := <-doInLoopCh:
 			fn()
