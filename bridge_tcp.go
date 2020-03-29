@@ -396,16 +396,12 @@ func startTCP(
 						conn.Close()
 					})
 					trigger(scope.Sub(
-						&conn, &outbound, &err,
-					), EvTCP, EvTCPWriteOutboundError)
+						&conn, &err,
+					), EvTCP, EvTCPWriteError)
 					deleteConn(conn)
 					continue
 				}
 				sent = true
-
-				trigger(scope.Sub(
-					&conn, &outbound,
-				), EvTCP, EvTCPOutboundSent)
 
 				if ipMatched || addrMatched {
 					break
@@ -415,8 +411,8 @@ func startTCP(
 
 			if !sent {
 				trigger(scope.Sub(
-					&outbound, &conns,
-				), EvTCP, EvTCPOutboundNotSent)
+					&conns,
+				), EvTCP, EvTCPNotSent)
 			}
 
 		case <-refreshConnsTicker.C:

@@ -15,9 +15,8 @@ const (
 	EvTCPAccepted
 	EvTCPDialed
 	EvTCPRefreshed
-	EvTCPWriteOutboundError
-	EvTCPOutboundSent
-	EvTCPOutboundNotSent
+	EvTCPWriteError
+	EvTCPNotSent
 	EvTCPListenerClosed
 	EvTCPClosed
 
