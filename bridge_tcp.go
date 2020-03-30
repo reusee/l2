@@ -27,6 +27,7 @@ type TCPConn struct {
 	closeOnce sync.Once
 	IPs       []net.IP
 	Addrs     []net.HardwareAddr
+	T0        time.Time
 }
 
 func startTCP(
@@ -264,6 +265,7 @@ func startTCP(
 								}
 								conn := &TCPConn{
 									TCPConn: netConn.(*net.TCPConn),
+									T0:      time.Now(),
 								}
 								doInLoop(func() {
 									conns[hostPort] = conn
@@ -322,6 +324,7 @@ func startTCP(
 								IPs: []net.IP{
 									node.LanIP,
 								},
+								T0: time.Now(),
 							}
 							trigger(scope.Sub(
 								&conn, &node.LanIP,
@@ -370,6 +373,9 @@ func startTCP(
 				skip := false
 				conn.RLock()
 				if len(conn.Addrs) == 0 && len(conn.IPs) == 0 {
+					skip = true
+				}
+				if time.Since(conn.T0) > portShiftInterval*2 {
 					skip = true
 				}
 				if ip != nil && len(conn.IPs) > 0 {
