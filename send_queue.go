@@ -38,9 +38,9 @@ func newSendQueue(
 ) *sendQueue {
 	return &sendQueue{
 		network:       network,
-		initCountDown: 1,
-		timerDuration: time.Millisecond * 5,
-		timer:         time.NewTimer(time.Millisecond * 5),
+		initCountDown: 2,
+		timerDuration: time.Microsecond * 2500,
+		timer:         time.NewTimer(time.Microsecond * 2500),
 		timerStarted:  true,
 		m:             make(map[queueKey]*queueValue),
 		sendFunc:      sendFunc,
@@ -130,5 +130,10 @@ func (q *sendQueue) tick() {
 			q.send(key)
 		}
 	}
-	q.timerStarted = false
+	if len(q.m) > 0 {
+		q.timer.Reset(q.timerDuration)
+		q.timerStarted = true
+	} else {
+		q.timerStarted = false
+	}
 }
