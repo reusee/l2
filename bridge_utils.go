@@ -30,6 +30,7 @@ func shiftingPorts(
 
 		if t != info.Time {
 			info.Time = t
+			info.Ports = info.Ports[:0]
 			for i := num - 1; i >= 0; i-- {
 				f := fnv.New64a()
 				if node.ID > 0 {
