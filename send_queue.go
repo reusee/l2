@@ -38,7 +38,7 @@ func newSendQueue(
 ) *sendQueue {
 	return &sendQueue{
 		network:       network,
-		initCountDown: 2,
+		initCountDown: 0,
 		timerDuration: time.Microsecond * 1500,
 		timer:         time.NewTimer(time.Microsecond * 1500),
 		timerStarted:  true,
@@ -126,7 +126,7 @@ func (q *sendQueue) enqueue(
 func (q *sendQueue) tick() {
 	for key, value := range q.m {
 		value.countDown--
-		if value.countDown == 0 {
+		if value.countDown <= 0 {
 			q.send(key)
 		}
 	}
