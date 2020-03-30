@@ -39,8 +39,8 @@ func newSendQueue(
 	return &sendQueue{
 		network:       network,
 		initCountDown: 2,
-		timerDuration: time.Microsecond * 2500,
-		timer:         time.NewTimer(time.Microsecond * 2500),
+		timerDuration: time.Microsecond * 1500,
+		timer:         time.NewTimer(time.Microsecond * 1500),
 		timerStarted:  true,
 		m:             make(map[queueKey]*queueValue),
 		sendFunc:      sendFunc,
