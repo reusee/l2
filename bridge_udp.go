@@ -210,28 +210,89 @@ func startUDP(
 	type queueK struct {
 		remote *UDPRemote
 	}
-	sendFunc := func(k queueKey, value *queueValue, data []byte) {
-		key := k.(queueK)
-		sent := false
-		for i := len(locals) - 1; i >= 0; i-- {
-			local := locals[i]
-			_, err := local.Conn.WriteToUDP(data, key.remote.UDPAddr)
-			if err != nil {
-				trigger(scope.Sub(
-					&local, &key.remote,
-				), EvUDP, EvUDPWriteError)
-				continue
+
+	queue := newSendQueue(
+		network,
+		func(ip *net.IP, addr *net.HardwareAddr, data []byte) {
+			sent := false
+
+			var remote *UDPRemote
+			// select remote
+			for i := len(remotes) - 1; i >= 0; i-- {
+				remote = remotes[i]
+
+				skip := false
+				ipMatched := false
+				addrMatched := false
+				if len(remote.Addrs) == 0 && len(remote.IPs) == 0 {
+					skip = true
+				}
+				if ip != nil && len(remote.IPs) > 0 {
+					ok := false
+					for _, remoteIP := range remote.IPs {
+						if remoteIP.Equal(*ip) {
+							ok = true
+							break
+						}
+					}
+					if !ok {
+						skip = true
+					} else {
+						ipMatched = true
+					}
+				}
+				if addr != nil && len(remote.Addrs) > 0 {
+					ok := false
+					for _, remoteAddr := range remote.Addrs {
+						if bytes.Equal(remoteAddr, *addr) {
+							ok = true
+							break
+						}
+					}
+					if !ok {
+						skip = true
+					} else {
+						addrMatched = true
+					}
+				}
+				if skip {
+					continue
+				}
+
+				if ipMatched || addrMatched {
+					break
+				}
+
 			}
-			sent = true
-			break
-		}
-		if !sent {
-			trigger(scope.Sub(
-				&key.remote, &remotes,
-			), EvUDP, EvUDPNotSent)
-		}
-	}
-	queue := newSendQueue(network, sendFunc)
+
+			if remote == nil {
+				trigger(scope.Sub(
+					&remotes,
+				), EvUDP, EvUDPNotSent)
+				return
+			}
+
+			// send
+			for i := len(locals) - 1; i >= 0; i-- {
+				local := locals[i]
+				_, err := local.Conn.WriteToUDP(data, remote.UDPAddr)
+				if err != nil {
+					trigger(scope.Sub(
+						&local, &remote,
+					), EvUDP, EvUDPWriteError)
+					continue
+				}
+				sent = true
+				break
+			}
+			if !sent {
+				trigger(scope.Sub(
+					&remote, &remotes,
+				), EvUDP, EvUDPNotSent)
+			}
+
+		},
+	)
 
 	for {
 		select {
@@ -364,58 +425,7 @@ func startUDP(
 			if outbound == nil {
 				break
 			}
-
-			for i := len(remotes) - 1; i >= 0; i-- {
-				remote := remotes[i]
-
-				// filter
-				skip := false
-				ipMatched := false
-				addrMatched := false
-				if len(remote.Addrs) == 0 && len(remote.IPs) == 0 {
-					skip = true
-				}
-				if outbound.DestIP != nil && len(remote.IPs) > 0 {
-					ok := false
-					for _, ip := range remote.IPs {
-						if ip.Equal(*outbound.DestIP) {
-							ok = true
-							break
-						}
-					}
-					if !ok {
-						skip = true
-					} else {
-						ipMatched = true
-					}
-				}
-				if outbound.DestAddr != nil && len(remote.Addrs) > 0 {
-					ok := false
-					for _, addr := range remote.Addrs {
-						if bytes.Equal(addr, *outbound.DestAddr) {
-							ok = true
-							break
-						}
-					}
-					if !ok {
-						skip = true
-					} else {
-						addrMatched = true
-					}
-				}
-				if skip {
-					continue
-				}
-
-				queue.enqueue(queueK{
-					remote: remote,
-				}, outbound)
-
-				if ipMatched || addrMatched {
-					break
-				}
-
-			}
+			queue.enqueue(outbound)
 
 		case <-queue.timer.C:
 			queue.tick()

@@ -355,17 +355,12 @@ func startTCP(
 	}
 	queue := newSendQueue(
 		network,
-		func(k queueKey, value *queueValue, data []byte) {
-			key := k.(qKey)
-			ip := net.IP(key.IP[:key.IPLen])
-			addr := net.HardwareAddr(key.Addr[:])
-
+		func(ip *net.IP, addr *net.HardwareAddr, data []byte) {
 			sent := false
 
 			for i := len(conns) - 1; i >= 0; i-- {
 				conn := conns[i]
 
-				// filter
 				skip := false
 				ipMatched := false
 				addrMatched := false
@@ -373,10 +368,10 @@ func startTCP(
 				if len(conn.Addrs) == 0 && len(conn.IPs) == 0 {
 					skip = true
 				}
-				if key.IPLen > 0 && len(conn.IPs) > 0 {
+				if ip != nil && len(conn.IPs) > 0 {
 					ok := false
 					for _, connIP := range conn.IPs {
-						if connIP.Equal(ip) {
+						if connIP.Equal(*ip) {
 							ok = true
 							break
 						}
@@ -387,10 +382,10 @@ func startTCP(
 						ipMatched = true
 					}
 				}
-				if key.HasAddr && len(conn.Addrs) > 0 {
+				if addr != nil && len(conn.Addrs) > 0 {
 					ok := false
 					for _, connAddr := range conn.Addrs {
-						if bytes.Equal(connAddr, addr) {
+						if bytes.Equal(connAddr, *addr) {
 							ok = true
 							break
 						}
@@ -441,16 +436,7 @@ func startTCP(
 			if outbound == nil {
 				break
 			}
-			var key qKey
-			if outbound.DestIP != nil {
-				key.IPLen = len(*outbound.DestIP)
-				copy(key.IP[:], *outbound.DestIP)
-			}
-			if outbound.DestAddr != nil {
-				key.HasAddr = true
-				copy(key.Addr[:], *outbound.DestAddr)
-			}
-			queue.enqueue(key, outbound)
+			queue.enqueue(outbound)
 
 		case <-refreshConnsTicker.C:
 			refreshConns()

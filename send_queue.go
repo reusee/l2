@@ -3,10 +3,9 @@ package l2
 import (
 	"bytes"
 	"encoding/binary"
+	"net"
 	"time"
 )
-
-type queueSendFunc func(queueKey, *queueValue, []byte)
 
 type sendQueue struct {
 	network       *Network
@@ -18,13 +17,20 @@ type sendQueue struct {
 	sendFunc      queueSendFunc
 }
 
-type queueKey any
+type queueKey struct {
+	IPLen   int
+	IP      [16]byte
+	HasAddr bool
+	Addr    [6]byte
+}
 
 type queueValue struct {
 	countDown int
 	length    int
 	datas     [][]byte
 }
+
+type queueSendFunc func(*net.IP, *net.HardwareAddr, []byte)
 
 func newSendQueue(
 	network *Network,
@@ -52,13 +58,32 @@ func (q *sendQueue) send(
 		_, err := buf.Write(data)
 		ce(err)
 	}
-	q.sendFunc(key, value, buf.Bytes())
+	var ipPtr *net.IP
+	if key.IPLen > 0 {
+		ip := net.IP(key.IP[:key.IPLen])
+		ipPtr = &ip
+	}
+	var addrPtr *net.HardwareAddr
+	if key.HasAddr {
+		addr := net.HardwareAddr(key.Addr[:])
+		addrPtr = &addr
+	}
+	q.sendFunc(ipPtr, addrPtr, buf.Bytes())
 }
 
 func (q *sendQueue) enqueue(
-	key queueKey,
 	outbound *Outbound,
 ) {
+	var key queueKey
+	if outbound.DestIP != nil {
+		key.IPLen = len(*outbound.DestIP)
+		copy(key.IP[:], *outbound.DestIP)
+	}
+	if outbound.DestAddr != nil {
+		key.HasAddr = true
+		copy(key.Addr[:], *outbound.DestAddr)
+	}
+
 	buf := new(bytes.Buffer)
 	if err := q.network.writeOutbound(buf, outbound); err != nil {
 		panic(err)
