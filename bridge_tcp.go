@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"math/rand"
 	"net"
 	"strconv"
 	"sync"
@@ -58,7 +59,7 @@ func startTCP(
 	listeners := make(map[string]*TCPListener)
 
 	// conn
-	var conns []*TCPConn
+	conns := make(map[string]*TCPConn)
 
 	// sync callback
 	doInLoopCh := make(chan func(), 1024)
@@ -70,26 +71,16 @@ func startTCP(
 	}
 
 	// conn funcs
-	addConn := func(conn *TCPConn) {
-		doInLoop(func() {
-			conns = append(conns, conn)
-			trigger(scope.Sub(
-				&conn,
-			), EvTCP, EvTCPConnAdded)
-		})
-	}
 	deleteConn := func(conn *TCPConn) {
 		doInLoop(func() {
 			// delete conn from conns
-			for i := 0; i < len(conns); {
-				if conns[i] == conn {
-					conns = append(conns[:i], conns[i+1:]...)
+			for hostPort, c := range conns {
+				if c == conn {
+					delete(conns, hostPort)
 					trigger(scope.Sub(
-						&conn,
+						&c,
 					), EvTCP, EvTCPConnDeleted)
-					continue
 				}
-				i++
 			}
 		})
 	}
@@ -274,7 +265,12 @@ func startTCP(
 								conn := &TCPConn{
 									TCPConn: netConn.(*net.TCPConn),
 								}
-								addConn(conn)
+								doInLoop(func() {
+									conns[hostPort] = conn
+									trigger(scope.Sub(
+										&conn,
+									), EvTCP, EvTCPConnAdded)
+								})
 								readConn(conn)
 							})
 
@@ -302,16 +298,12 @@ func startTCP(
 					for _, port := range ports {
 						port := port
 						hostPort := net.JoinHostPort(ip.String(), strconv.Itoa(port))
-						exists := false
-						for _, c := range conns {
-							if c.RemoteAddr().String() == hostPort {
-								exists = true
-								break
-							}
-						}
-						if exists {
+						if _, ok := conns[hostPort]; ok {
 							continue
 						}
+						doInLoop(func() {
+							conns[hostPort] = nil
+						})
 
 						// connect
 						spawn(scope, func() {
@@ -334,7 +326,12 @@ func startTCP(
 							trigger(scope.Sub(
 								&conn, &node.LanIP,
 							), EvTCP, EvTCPConnGotIP)
-							addConn(conn)
+							doInLoop(func() {
+								conns[hostPort] = conn
+								trigger(scope.Sub(
+									&conn,
+								), EvTCP, EvTCPConnAdded)
+							})
 							readConn(conn)
 						})
 					}
@@ -365,12 +362,12 @@ func startTCP(
 		func(ip *net.IP, addr *net.HardwareAddr, data []byte) {
 			sent := false
 
-			for i := len(conns) - 1; i >= 0; i-- {
-				conn := conns[i]
-
+			var candidates []*TCPConn
+			for _, conn := range conns {
+				if conn == nil {
+					continue
+				}
 				skip := false
-				ipMatched := false
-				addrMatched := false
 				conn.RLock()
 				if len(conn.Addrs) == 0 && len(conn.IPs) == 0 {
 					skip = true
@@ -385,8 +382,6 @@ func startTCP(
 					}
 					if !ok {
 						skip = true
-					} else {
-						ipMatched = true
 					}
 				}
 				if addr != nil && len(conn.Addrs) > 0 {
@@ -399,16 +394,18 @@ func startTCP(
 					}
 					if !ok {
 						skip = true
-					} else {
-						addrMatched = true
 					}
 				}
 				conn.RUnlock()
 				if skip {
 					continue
 				}
+				candidates = append(candidates, conn)
+			}
 
-				// send
+			// send
+			for _, i := range rand.Perm(len(candidates)) {
+				conn := candidates[i]
 				if _, err := conn.Write(data); err != nil {
 					conn.closeOnce.Do(func() {
 						conn.Close()
@@ -419,13 +416,8 @@ func startTCP(
 					deleteConn(conn)
 					continue
 				}
-
 				sent = true
-
-				if ipMatched || addrMatched {
-					break
-				}
-
+				break
 			}
 
 			if !sent {
@@ -471,7 +463,9 @@ func startTCP(
 				ln.Listener.Close()
 			}
 			for _, conn := range conns {
-				_ = conn.SetDeadline(getTime().Add(-time.Hour))
+				if conn != nil {
+					_ = conn.SetDeadline(getTime().Add(-time.Hour))
+				}
 			}
 			trigger(scope, EvTCP, EvTCPClosed)
 			return
