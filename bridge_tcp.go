@@ -268,7 +268,7 @@ func startTCP(
 									T0:      time.Now(),
 								}
 								doInLoop(func() {
-									conns[hostPort] = conn
+									conns[netConn.RemoteAddr().String()] = conn
 									trigger(scope.Sub(
 										&conn,
 									), EvTCP, EvTCPConnAdded)
