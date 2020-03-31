@@ -90,6 +90,23 @@ func startTCP(
 		inboundSenderGroup.Add(1)
 		defer inboundSenderGroup.Done()
 
+		var err error
+		defer func() {
+			if err != nil {
+				trigger(scope.Sub(
+					&conn, &err,
+				), EvTCP, EvTCPReadInboundError)
+			}
+			conn.closeOnce.Do(func() {
+				conn.Close()
+			})
+			select {
+			case <-closing:
+			default:
+				deleteConn(conn)
+			}
+		}()
+
 		parser := gopacket.NewDecodingLayerParser(layers.LayerTypeEthernet)
 		parser.SetDecodingLayerContainer(gopacket.DecodingLayerSparse(nil))
 		var eth layers.Ethernet
@@ -100,31 +117,20 @@ func startTCP(
 		parser.AddDecodingLayer(&arp)
 		decoded := make([]gopacket.LayerType, 0, 10)
 
+		var inbound *Inbound
 		for {
 			var length uint16
-			if err := binary.Read(conn, binary.LittleEndian, &length); err != nil {
+			if err = binary.Read(conn, binary.LittleEndian, &length); err != nil {
 				break
 			}
-			inbound, err := network.readInbound(
+			inbound, err = network.readInbound(
 				&io.LimitedReader{
 					R: conn,
 					N: int64(length),
 				},
 			)
-
 			if err != nil {
-				trigger(scope.Sub(
-					&conn, &err,
-				), EvTCP, EvTCPReadInboundError)
-				conn.closeOnce.Do(func() {
-					conn.Close()
-				})
-				select {
-				case <-closing:
-				default:
-					deleteConn(conn)
-				}
-				return
+				break
 			}
 
 			conn.RLock()
