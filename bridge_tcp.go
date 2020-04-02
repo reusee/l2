@@ -8,6 +8,7 @@ import (
 	"io"
 	"math/rand"
 	"net"
+	"sort"
 	"strconv"
 	"sync"
 	"time"
@@ -378,12 +379,11 @@ func startTCP(
 				}
 				skip := false
 				conn.RLock()
+				// no identity
 				if len(conn.Addrs) == 0 && len(conn.IPs) == 0 {
 					skip = true
 				}
-				if time.Since(conn.T0) > portShiftInterval*2 {
-					skip = true
-				}
+				// ip not match
 				if ip != nil && len(conn.IPs) > 0 {
 					ok := false
 					for _, connIP := range conn.IPs {
@@ -396,6 +396,7 @@ func startTCP(
 						skip = true
 					}
 				}
+				// addr not match
 				if addr != nil && len(conn.Addrs) > 0 {
 					ok := false
 					for _, connAddr := range conn.Addrs {
@@ -415,9 +416,35 @@ func startTCP(
 				candidates = append(candidates, conn)
 			}
 
+			sort.Slice(candidates, func(i, j int) bool {
+				a := candidates[i]
+				b := candidates[j]
+
+				aIsNew := time.Since(a.T0) < portShiftInterval
+				bIsNew := time.Since(b.T0) < portShiftInterval
+				if aIsNew != bIsNew {
+					if aIsNew && !bIsNew {
+						return true
+					} else if !aIsNew && bIsNew {
+						return false
+					}
+				}
+
+				aGotAddr := len(a.Addrs) > 0
+				bGotAddr := len(b.Addrs) > 0
+				if aGotAddr != bGotAddr {
+					if aGotAddr && !bGotAddr {
+						return true
+					} else if !aGotAddr && bGotAddr {
+						return false
+					}
+				}
+
+				return rand.Intn(2) == 0
+			})
+
 			// send
-			for _, i := range rand.Perm(len(candidates)) {
-				conn := candidates[i]
+			for _, conn := range candidates {
 				if _, err := conn.Write(data); err != nil {
 					conn.closeOnce.Do(func() {
 						conn.Close()
@@ -434,7 +461,7 @@ func startTCP(
 
 			if !sent {
 				trigger(scope.Sub(
-					&conns,
+					&conns, &ip, &addr,
 				), EvTCP, EvTCPNotSent)
 			}
 		},
