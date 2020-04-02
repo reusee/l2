@@ -318,12 +318,18 @@ func startTCP(
 						spawn(scope, func() {
 							netConn, err := dialer.Dial("tcp", hostPort)
 							if err != nil {
+								doInLoop(func() {
+									delete(conns, hostPort)
+								})
 								return
 							}
 							trigger(scope.Sub(
 								&node, &netConn,
 							), EvTCP, EvTCPDialed)
 							if err := netConn.SetDeadline(getTime().Add(connDuration)); err != nil {
+								doInLoop(func() {
+									delete(conns, hostPort)
+								})
 								return
 							}
 							conn := &TCPConn{
