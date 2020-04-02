@@ -110,6 +110,11 @@ func (q *sendQueue) enqueue(
 		}
 	}
 
+	if q.initCountDown <= 0 {
+		q.send(key)
+		return
+	}
+
 	if len(q.m) > 0 && !q.timerStarted {
 		if !q.timer.Stop() {
 			select {
