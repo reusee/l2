@@ -51,7 +51,7 @@ func startTCP(
 	listenerDuration := portShiftInterval * 2
 	connDuration := portShiftInterval * 3
 	getPorts := shiftingPorts(
-		1,
+		3,
 		fmt.Sprintf("%x-tcp-", network.CryptoKey),
 		portShiftInterval,
 	)
@@ -381,7 +381,7 @@ func startTCP(
 				if len(conn.Addrs) == 0 && len(conn.IPs) == 0 {
 					skip = true
 				}
-				if d := time.Until(conn.T0.Add(connDuration)); d < time.Second*3 {
+				if time.Since(conn.T0) > portShiftInterval*2 {
 					skip = true
 				}
 				if ip != nil && len(conn.IPs) > 0 {
