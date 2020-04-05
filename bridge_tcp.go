@@ -51,8 +51,7 @@ func startTCP(
 	portShiftInterval := time.Millisecond * 5113
 	listenerDuration := portShiftInterval * 2
 	connDuration := portShiftInterval * 3
-	getPorts := shiftingPorts(
-		3,
+	getPort := shiftingPort(
 		fmt.Sprintf("%x-tcp-", network.CryptoKey),
 		portShiftInterval,
 	)
@@ -233,61 +232,58 @@ func startTCP(
 			now := getTime()
 
 			if node == network.LocalNode {
-				ports := getPorts(node, now.Add(time.Millisecond*500))
-				for _, port := range ports {
-					port := port
-					hostPort := net.JoinHostPort("0.0.0.0", strconv.Itoa(port))
+				port := getPort(node, now.Add(time.Millisecond*500))
+				hostPort := net.JoinHostPort("0.0.0.0", strconv.Itoa(port))
 
-					// local node, listen
-					if _, ok := listeners[hostPort]; ok {
-						continue
-					}
+				// local node, listen
+				if _, ok := listeners[hostPort]; ok {
+					continue
+				}
 
-					// listen
-					ln, err := listenConfig.Listen(context.Background(), "tcp", hostPort)
-					if err != nil {
-						continue
-					}
-					listener := &TCPListener{
-						Listener:  ln,
-						StartedAt: getTime(),
-					}
-					trigger(scope.Sub(
-						&listener,
-					), EvTCP, EvTCPListened)
+				// listen
+				ln, err := listenConfig.Listen(context.Background(), "tcp", hostPort)
+				if err != nil {
+					continue
+				}
+				listener := &TCPListener{
+					Listener:  ln,
+					StartedAt: getTime(),
+				}
+				trigger(scope.Sub(
+					&listener,
+				), EvTCP, EvTCPListened)
 
-					spawn(scope, func() {
-						for {
-							netConn, err := ln.Accept()
-							if err != nil {
+				spawn(scope, func() {
+					for {
+						netConn, err := ln.Accept()
+						if err != nil {
+							return
+						}
+						trigger(scope.Sub(
+							&listener, &netConn,
+						), EvTCP, EvTCPAccepted)
+
+						spawn(scope, func() {
+							if err := netConn.SetDeadline(getTime().Add(connDuration)); err != nil {
 								return
 							}
-							trigger(scope.Sub(
-								&listener, &netConn,
-							), EvTCP, EvTCPAccepted)
-
-							spawn(scope, func() {
-								if err := netConn.SetDeadline(getTime().Add(connDuration)); err != nil {
-									return
-								}
-								conn := &TCPConn{
-									TCPConn: netConn.(*net.TCPConn),
-									T0:      time.Now(),
-								}
-								doInLoop(func() {
-									conns[netConn.RemoteAddr().String()] = conn
-									trigger(scope.Sub(
-										&conn,
-									), EvTCP, EvTCPConnAdded)
-								})
-								readConn(conn)
+							conn := &TCPConn{
+								TCPConn: netConn.(*net.TCPConn),
+								T0:      time.Now(),
+							}
+							doInLoop(func() {
+								conns[netConn.RemoteAddr().String()] = conn
+								trigger(scope.Sub(
+									&conn,
+								), EvTCP, EvTCPConnAdded)
 							})
+							readConn(conn)
+						})
 
-						}
-					})
+					}
+				})
 
-					listeners[hostPort] = listener
-				}
+				listeners[hostPort] = listener
 
 			} else {
 				// non-local node
@@ -303,54 +299,51 @@ func startTCP(
 				}
 
 				if len(ip) > 0 {
-					ports := getPorts(node, now)
-					for _, port := range ports {
-						port := port
-						hostPort := net.JoinHostPort(ip.String(), strconv.Itoa(port))
-						if _, ok := conns[hostPort]; ok {
-							continue
-						}
-						doInLoop(func() {
-							conns[hostPort] = nil
-						})
-
-						// connect
-						spawn(scope, func() {
-							netConn, err := dialer.Dial("tcp", hostPort)
-							if err != nil {
-								doInLoop(func() {
-									delete(conns, hostPort)
-								})
-								return
-							}
-							trigger(scope.Sub(
-								&node, &netConn,
-							), EvTCP, EvTCPDialed)
-							if err := netConn.SetDeadline(getTime().Add(connDuration)); err != nil {
-								doInLoop(func() {
-									delete(conns, hostPort)
-								})
-								return
-							}
-							conn := &TCPConn{
-								TCPConn: netConn.(*net.TCPConn),
-								IPs: []net.IP{
-									node.LanIP,
-								},
-								T0: time.Now(),
-							}
-							trigger(scope.Sub(
-								&conn, &node.LanIP,
-							), EvTCP, EvTCPConnGotIP)
-							doInLoop(func() {
-								conns[hostPort] = conn
-								trigger(scope.Sub(
-									&conn,
-								), EvTCP, EvTCPConnAdded)
-							})
-							readConn(conn)
-						})
+					port := getPort(node, now)
+					hostPort := net.JoinHostPort(ip.String(), strconv.Itoa(port))
+					if _, ok := conns[hostPort]; ok {
+						continue
 					}
+					doInLoop(func() {
+						conns[hostPort] = nil
+					})
+
+					// connect
+					spawn(scope, func() {
+						netConn, err := dialer.Dial("tcp", hostPort)
+						if err != nil {
+							doInLoop(func() {
+								delete(conns, hostPort)
+							})
+							return
+						}
+						trigger(scope.Sub(
+							&node, &netConn,
+						), EvTCP, EvTCPDialed)
+						if err := netConn.SetDeadline(getTime().Add(connDuration)); err != nil {
+							doInLoop(func() {
+								delete(conns, hostPort)
+							})
+							return
+						}
+						conn := &TCPConn{
+							TCPConn: netConn.(*net.TCPConn),
+							IPs: []net.IP{
+								node.LanIP,
+							},
+							T0: time.Now(),
+						}
+						trigger(scope.Sub(
+							&conn, &node.LanIP,
+						), EvTCP, EvTCPConnGotIP)
+						doInLoop(func() {
+							conns[hostPort] = conn
+							trigger(scope.Sub(
+								&conn,
+							), EvTCP, EvTCPConnAdded)
+						})
+						readConn(conn)
+					})
 				}
 
 			}
