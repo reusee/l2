@@ -60,30 +60,26 @@ func startTCP(
 	listeners := make(map[string]*TCPListener)
 
 	// conn
-	conns := make(map[string]*TCPConn)
-
-	// sync callback
-	doInLoopCh := make(chan func(), 1024)
-	doInLoop := func(fn func()) {
-		select {
-		case doInLoopCh <- fn:
-		case <-closing:
-		}
-	}
+	// string -> *TCPConn
+	var conns sync.Map
 
 	// conn funcs
 	deleteConn := func(conn *TCPConn) {
-		doInLoop(func() {
-			// delete conn from conns
-			for hostPort, c := range conns {
-				if c == conn {
-					delete(conns, hostPort)
-					trigger(scope.Sub(
-						&c,
-					), EvTCP, EvTCPConnDeleted)
-				}
+		// delete conn from conns
+		var deleted []*TCPConn
+		conns.Range(func(k, v any) bool {
+			c := v.(*TCPConn)
+			if c == conn {
+				conns.Delete(k)
+				deleted = append(deleted, c)
 			}
+			return true
 		})
+		for _, c := range deleted {
+			trigger(scope.Sub(
+				&c,
+			), EvTCP, EvTCPConnDeleted)
+		}
 	}
 
 	readConn := func(conn *TCPConn) {
@@ -271,12 +267,10 @@ func startTCP(
 								TCPConn: netConn.(*net.TCPConn),
 								T0:      time.Now(),
 							}
-							doInLoop(func() {
-								conns[netConn.RemoteAddr().String()] = conn
-								trigger(scope.Sub(
-									&conn,
-								), EvTCP, EvTCPConnAdded)
-							})
+							conns.Store(netConn.RemoteAddr().String(), conn)
+							trigger(scope.Sub(
+								&conn,
+							), EvTCP, EvTCPConnAdded)
 							readConn(conn)
 						})
 
@@ -301,29 +295,23 @@ func startTCP(
 				if len(ip) > 0 {
 					port := getPort(node, now)
 					hostPort := net.JoinHostPort(ip.String(), strconv.Itoa(port))
-					if _, ok := conns[hostPort]; ok {
+					if _, ok := conns.Load(hostPort); ok {
 						continue
 					}
-					doInLoop(func() {
-						conns[hostPort] = nil
-					})
+					conns.Store(hostPort, nil)
 
 					// connect
 					spawn(scope, func() {
 						netConn, err := dialer.Dial("tcp", hostPort)
 						if err != nil {
-							doInLoop(func() {
-								delete(conns, hostPort)
-							})
+							conns.Delete(hostPort)
 							return
 						}
 						trigger(scope.Sub(
 							&node, &netConn,
 						), EvTCP, EvTCPDialed)
 						if err := netConn.SetDeadline(getTime().Add(connDuration)); err != nil {
-							doInLoop(func() {
-								delete(conns, hostPort)
-							})
+							conns.Delete(hostPort)
 							return
 						}
 						conn := &TCPConn{
@@ -336,12 +324,10 @@ func startTCP(
 						trigger(scope.Sub(
 							&conn, &node.LanIP,
 						), EvTCP, EvTCPConnGotIP)
-						doInLoop(func() {
-							conns[hostPort] = conn
-							trigger(scope.Sub(
-								&conn,
-							), EvTCP, EvTCPConnAdded)
-						})
+						conns.Store(hostPort, conn)
+						trigger(scope.Sub(
+							&conn,
+						), EvTCP, EvTCPConnAdded)
 						readConn(conn)
 					})
 				}
@@ -372,10 +358,11 @@ func startTCP(
 			sent := false
 
 			var candidates []*TCPConn
-			for _, conn := range conns {
-				if conn == nil {
-					continue
+			conns.Range(func(k, v any) bool {
+				if v == nil {
+					return true
 				}
+				conn := v.(*TCPConn)
 				skip := false
 				conn.RLock()
 				// no identity
@@ -410,10 +397,11 @@ func startTCP(
 				}
 				conn.RUnlock()
 				if skip {
-					continue
+					return true
 				}
 				candidates = append(candidates, conn)
-			}
+				return true
+			})
 
 			sort.Slice(candidates, func(i, j int) bool {
 				a := candidates[i]
@@ -493,18 +481,18 @@ func startTCP(
 		case <-queue.timer.C:
 			queue.tick()
 
-		case fn := <-doInLoopCh:
-			fn()
-
 		case <-closing:
 			for _, ln := range listeners {
 				ln.Listener.Close()
 			}
-			for _, conn := range conns {
-				if conn != nil {
-					_ = conn.SetDeadline(getTime().Add(-time.Hour))
+			conns.Range(func(k, v any) bool {
+				if v == nil {
+					return true
 				}
-			}
+				conn := v.(*TCPConn)
+				_ = conn.SetDeadline(getTime().Add(-time.Hour))
+				return true
+			})
 			trigger(scope, EvTCP, EvTCPClosed)
 			return
 
