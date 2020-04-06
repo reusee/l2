@@ -68,6 +68,9 @@ func startTCP(
 		// delete conn from conns
 		var deleted []*TCPConn
 		conns.Range(func(k, v any) bool {
+			if v == nil {
+				return true
+			}
 			c := v.(*TCPConn)
 			if c == conn {
 				conns.Delete(k)
