@@ -308,6 +308,9 @@ func startTCP(
 						netConn, err := dialer.Dial("tcp", hostPort)
 						if err != nil {
 							conns.Delete(hostPort)
+							trigger(scope.Sub(
+								&hostPort,
+							), EvTCP, EvTCPDialFailed)
 							return
 						}
 						trigger(scope.Sub(

@@ -14,6 +14,7 @@ const (
 	EvTCPListened
 	EvTCPAccepted
 	EvTCPDialed
+	EvTCPDialFailed
 	EvTCPRefreshed
 	EvTCPWriteError
 	EvTCPNotSent
