@@ -309,7 +309,7 @@ func startTCP(
 						if err != nil {
 							conns.Delete(hostPort)
 							trigger(scope.Sub(
-								&hostPort,
+								&hostPort, &node,
 							), EvTCP, EvTCPDialFailed)
 							return
 						}
