@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"sync"
 	"time"
 
 	"github.com/google/gopacket"
@@ -42,11 +41,9 @@ func startUDP(
 	network *Network,
 	getTime func() time.Time,
 	inboundCh chan *Inbound,
-	inboundSenderGroup *sync.WaitGroup,
 	trigger Trigger,
 	bridgeIndex BridgeIndex,
 	localAddrs []net.Addr,
-	ifaceAddr net.HardwareAddr,
 ) {
 
 	portShiftInterval := time.Millisecond * 8311
@@ -218,10 +215,10 @@ func startUDP(
 		func(ip *net.IP, addr *net.HardwareAddr, data []byte) {
 			sent := false
 
-			var remote *UDPRemote
+			var r *UDPRemote
 			// select remote
 			for i := len(remotes) - 1; i >= 0; i-- {
-				remote = remotes[i]
+				remote := remotes[i]
 
 				skip := false
 				ipMatched := false
@@ -262,12 +259,13 @@ func startUDP(
 				}
 
 				if ipMatched || addrMatched {
+					r = remote
 					break
 				}
 
 			}
 
-			if remote == nil {
+			if r == nil {
 				trigger(scope.Sub(
 					&remotes,
 				), EvUDP, EvUDPNotSent)
@@ -277,10 +275,10 @@ func startUDP(
 			// send
 			for i := len(locals) - 1; i >= 0; i-- {
 				local := locals[i]
-				_, err := local.Conn.WriteToUDP(data, remote.UDPAddr)
+				_, err := local.Conn.WriteToUDP(data, r.UDPAddr)
 				if err != nil {
 					trigger(scope.Sub(
-						&local, &remote,
+						&local, &r,
 					), EvUDP, EvUDPWriteError)
 					continue
 				}
@@ -289,7 +287,7 @@ func startUDP(
 			}
 			if !sent {
 				trigger(scope.Sub(
-					&remote, &remotes,
+					&r, &remotes,
 				), EvUDP, EvUDPNotSent)
 			}
 

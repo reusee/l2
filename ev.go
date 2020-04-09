@@ -36,6 +36,12 @@ const (
 	EvUDPNotSent
 	EvUDPClosed
 
+	EvICMP
+	EvICMPReady
+	EvICMPClosed
+	EvICMPNotSent
+	EvICMPInboundSent
+
 	EvNetwork
 	EvNetworkClosing
 	EvNetworkOutboundSent
