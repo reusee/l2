@@ -13,6 +13,7 @@ const (
 	EvTCPInboundSent
 	EvTCPListened
 	EvTCPAccepted
+	EvTCPDialing
 	EvTCPDialed
 	EvTCPDialFailed
 	EvTCPRefreshed
