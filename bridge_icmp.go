@@ -81,24 +81,28 @@ func startICMP(
 	inbounds := make(chan ICMPInbound, 1024)
 
 	// local
-	node := network.LocalNode
-	ip := node.wanIP
-	if len(ip) == 0 && len(node.PrivateIP) > 0 {
-		for _, addr := range localAddrs {
-			if ipnet, ok := addr.(*net.IPNet); ok && ipnet.Contains(node.PrivateIP) {
-				ip = node.PrivateIP
-				break
+	var localConn *net.IPConn
+	localConnOK := make(chan struct{})
+	spawn(scope, func() {
+		node := network.LocalNode
+		ip := node.wanIP
+		if len(ip) == 0 && len(node.PrivateIP) > 0 {
+			for _, addr := range localAddrs {
+				if ipnet, ok := addr.(*net.IPNet); ok && ipnet.Contains(node.PrivateIP) {
+					ip = node.PrivateIP
+					break
+				}
 			}
 		}
-	}
-	if len(ip) == 0 {
-		return
-	}
-	localConn, err := net.ListenIP("ip4:icmp", &net.IPAddr{
-		IP: net.ParseIP("0.0.0.0"),
-	})
-	ce(err)
-	spawn(scope, func() {
+		if len(ip) == 0 {
+			return
+		}
+		var err error
+		localConn, err = net.ListenIP("ip4:icmp", &net.IPAddr{
+			IP: net.ParseIP("0.0.0.0"),
+		})
+		ce(err)
+		close(localConnOK)
 		buf := make([]byte, network.MTU*2)
 		for {
 			n, addr, err := localConn.ReadFrom(buf)
@@ -271,6 +275,7 @@ func startICMP(
 			}
 			payload, err := msg.Marshal(nil)
 			ce(err)
+			<-localConnOK
 			if _, err := localConn.WriteTo(payload, &net.IPAddr{
 				IP: r.IP,
 			}); err != nil {
