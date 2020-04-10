@@ -472,19 +472,23 @@ func startTCP(
 
 	for {
 		t0 := time.Now()
+		var op string
 
 		select {
 
 		case outbound := <-outboundCh:
+			op = "enqueue outbound"
 			if outbound == nil {
 				break
 			}
 			queue.enqueue(outbound)
 
 		case <-refreshConnsTicker.C:
+			op = "refresh"
 			refreshConns()
 
 		case <-listenerCheckTicker.C:
+			op = "check listeners"
 			now := getTime()
 			for addr, listener := range listeners {
 				if now.Sub(listener.StartedAt) > listenerDuration {
@@ -497,6 +501,7 @@ func startTCP(
 			}
 
 		case <-queue.timer.C:
+			op = "queue tick"
 			queue.tick()
 
 		case <-closing:
@@ -521,7 +526,7 @@ func startTCP(
 
 		if d := time.Since(t0); d > time.Second*5 {
 			trigger(scope.Sub(
-				&d,
+				&d, &op,
 			), EvTCP, EvTCPSlow)
 		}
 
