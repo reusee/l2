@@ -11,6 +11,8 @@ const (
 	EvTCPConnGotAddr
 	EvTCPConnGotIP
 	EvTCPInboundSent
+	EvTCPListening
+	EvTCPListenFailed
 	EvTCPListened
 	EvTCPAccepted
 	EvTCPDialing

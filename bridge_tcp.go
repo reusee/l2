@@ -242,8 +242,14 @@ func startTCP(
 				}
 
 				// listen
+				trigger(scope.Sub(
+					&hostPort,
+				), EvTCP, EvTCPListening)
 				ln, err := listenConfig.Listen(context.Background(), "tcp", hostPort)
 				if err != nil {
+					trigger(scope.Sub(
+						&hostPort, &err,
+					), EvTCP, EvTCPListenFailed)
 					continue
 				}
 				listener := &TCPListener{
