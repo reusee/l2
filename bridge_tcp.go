@@ -214,6 +214,8 @@ func startTCP(
 		}
 	}
 
+	dialer := newDialer()
+	dialer.Timeout = listenerDuration
 	refreshConns := func() {
 		for _, node := range network.nodes.Load().([]*Node) {
 			hasTCP := false
