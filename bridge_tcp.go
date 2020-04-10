@@ -471,6 +471,8 @@ func startTCP(
 	)
 
 	for {
+		t0 := time.Now()
+
 		select {
 
 		case outbound := <-outboundCh:
@@ -516,6 +518,13 @@ func startTCP(
 			return
 
 		}
+
+		if d := time.Since(t0); d > time.Second*5 {
+			trigger(scope.Sub(
+				&d,
+			), EvTCP, EvTCPSlow)
+		}
+
 	}
 
 }

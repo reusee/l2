@@ -23,6 +23,7 @@ const (
 	EvTCPNotSent
 	EvTCPListenerClosed
 	EvTCPClosed
+	EvTCPSlow
 
 	EvUDP
 	EvUDPReady
