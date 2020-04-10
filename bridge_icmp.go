@@ -82,6 +82,7 @@ func startICMP(
 
 	// local
 	var localConn *net.IPConn
+	localConnOK := make(chan struct{})
 	spawn(scope, func() {
 		node := network.LocalNode
 		ip := node.wanIP
@@ -101,6 +102,7 @@ func startICMP(
 			IP: net.ParseIP("0.0.0.0"),
 		})
 		ce(err)
+		close(localConnOK)
 		buf := make([]byte, network.MTU*2)
 		for {
 			n, addr, err := localConn.ReadFrom(buf)
@@ -273,6 +275,7 @@ func startICMP(
 			}
 			payload, err := msg.Marshal(nil)
 			ce(err)
+			<-localConnOK
 			if _, err := localConn.WriteTo(payload, &net.IPAddr{
 				IP: r.IP,
 			}); err != nil {
