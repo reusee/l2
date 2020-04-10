@@ -188,7 +188,7 @@ func startUDP(
 
 	}
 
-	port := getPort(network.LocalNode, getTime().Add(time.Second))
+	port := getPort(network.LocalNode, getTime())
 	addLocal(port)
 
 	close(ready)
@@ -300,7 +300,7 @@ func startUDP(
 		case <-refreshConnsTicker.C:
 			now := getTime()
 			// add local conn
-			port := getPort(network.LocalNode, getTime().Add(time.Second))
+			port := getPort(network.LocalNode, getTime())
 			addLocal(port)
 			// delete local conn
 			for i := 0; i < len(locals); {

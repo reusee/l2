@@ -233,7 +233,7 @@ func startTCP(
 			now := getTime()
 
 			if node == network.LocalNode {
-				port := getPort(node, now.Add(time.Second*2))
+				port := getPort(node, now)
 				hostPort := net.JoinHostPort("0.0.0.0", strconv.Itoa(port))
 
 				// local node, listen
