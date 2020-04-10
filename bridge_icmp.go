@@ -81,26 +81,24 @@ func startICMP(
 	inbounds := make(chan ICMPInbound, 1024)
 
 	// local
-	var localConn *net.IPConn
-	spawn(scope, func() {
-		node := network.LocalNode
-		ip := node.wanIP
-		if len(ip) == 0 && len(node.PrivateIP) > 0 {
-			for _, addr := range localAddrs {
-				if ipnet, ok := addr.(*net.IPNet); ok && ipnet.Contains(node.PrivateIP) {
-					ip = node.PrivateIP
-					break
-				}
+	node := network.LocalNode
+	ip := node.wanIP
+	if len(ip) == 0 && len(node.PrivateIP) > 0 {
+		for _, addr := range localAddrs {
+			if ipnet, ok := addr.(*net.IPNet); ok && ipnet.Contains(node.PrivateIP) {
+				ip = node.PrivateIP
+				break
 			}
 		}
-		if len(ip) == 0 {
-			return
-		}
-		var err error
-		localConn, err = net.ListenIP("ip4:icmp", &net.IPAddr{
-			IP: net.ParseIP("0.0.0.0"),
-		})
-		ce(err)
+	}
+	if len(ip) == 0 {
+		return
+	}
+	localConn, err := net.ListenIP("ip4:icmp", &net.IPAddr{
+		IP: net.ParseIP("0.0.0.0"),
+	})
+	ce(err)
+	spawn(scope, func() {
 		buf := make([]byte, network.MTU*2)
 		for {
 			n, addr, err := localConn.ReadFrom(buf)
