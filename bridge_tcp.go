@@ -314,7 +314,7 @@ func startTCP(
 							return
 						}
 						trigger(scope.Sub(
-							&node, &netConn,
+							&hostPort, &node, &netConn,
 						), EvTCP, EvTCPDialed)
 						if err := netConn.SetDeadline(getTime().Add(connDuration)); err != nil {
 							conns.Delete(hostPort)
@@ -490,6 +490,9 @@ func startTCP(
 		case <-closing:
 			for _, ln := range listeners {
 				ln.Listener.Close()
+				trigger(scope.Sub(
+					&ln,
+				), EvTCP, EvTCPListenerClosed)
 			}
 			conns.Range(func(k, v any) bool {
 				if v == nil {
