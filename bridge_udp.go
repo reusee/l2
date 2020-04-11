@@ -275,6 +275,7 @@ func startUDP(
 			// send
 			for i := len(locals) - 1; i >= 0; i-- {
 				local := locals[i]
+				local.Conn.SetWriteDeadline(time.Now().Add(time.Second * 2))
 				_, err := local.Conn.WriteToUDP(data, r.UDPAddr)
 				if err != nil {
 					trigger(scope.Sub(

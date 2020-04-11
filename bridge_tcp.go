@@ -448,6 +448,7 @@ func startTCP(
 
 			// send
 			for _, conn := range candidates {
+				conn.SetWriteDeadline(time.Now().Add(time.Second * 2))
 				if _, err := conn.Write(data); err != nil {
 					conn.closeOnce.Do(func() {
 						conn.Close()
