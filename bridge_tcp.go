@@ -3,7 +3,9 @@ package l2
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"fmt"
+	"io"
 	"math/rand"
 	"net"
 	"sort"
@@ -116,7 +118,16 @@ func startTCP(
 
 		var inbound *Inbound
 		for {
-			inbound, err = network.readInbound(conn)
+			var length uint16
+			if err = binary.Read(conn, binary.LittleEndian, &length); err != nil {
+				break
+			}
+			inbound, err = network.readInbound(
+				&io.LimitedReader{
+					R: conn,
+					N: int64(length),
+				},
+			)
 			if err != nil {
 				break
 			}
@@ -351,21 +362,15 @@ func startTCP(
 	close(ready)
 	trigger(scope, EvTCP, EvTCPReady)
 
-	for {
-		t0 := time.Now()
-		var op string
-
-		select {
-
-		case outbound := <-outboundCh:
-			op = "send outbound"
-			if outbound == nil {
-				break
-			}
-
-			buf := new(bytes.Buffer)
-			ce(network.writeOutbound(buf, outbound))
-			data := buf.Bytes()
+	type qKey struct {
+		IPLen   int
+		IP      [16]byte
+		HasAddr bool
+		Addr    [6]byte
+	}
+	queue := newSendQueue(
+		network,
+		func(ip *net.IP, addr *net.HardwareAddr, data []byte) {
 			sent := false
 
 			var candidates []*TCPConn
@@ -381,10 +386,10 @@ func startTCP(
 					skip = true
 				}
 				// ip not match
-				if outbound.DestIP != nil && len(conn.IPs) > 0 {
+				if ip != nil && len(conn.IPs) > 0 {
 					ok := false
 					for _, connIP := range conn.IPs {
-						if connIP.Equal(*outbound.DestIP) {
+						if connIP.Equal(*ip) {
 							ok = true
 							break
 						}
@@ -394,10 +399,10 @@ func startTCP(
 					}
 				}
 				// addr not match
-				if outbound.DestAddr != nil && len(conn.Addrs) > 0 {
+				if addr != nil && len(conn.Addrs) > 0 {
 					ok := false
 					for _, connAddr := range conn.Addrs {
-						if bytes.Equal(connAddr, *outbound.DestAddr) {
+						if bytes.Equal(connAddr, *addr) {
 							ok = true
 							break
 						}
@@ -459,9 +464,24 @@ func startTCP(
 
 			if !sent {
 				trigger(scope.Sub(
-					&conns, &outbound.DestIP, &outbound.DestAddr,
+					&conns, &ip, &addr,
 				), EvTCP, EvTCPNotSent)
 			}
+		},
+	)
+
+	for {
+		t0 := time.Now()
+		var op string
+
+		select {
+
+		case outbound := <-outboundCh:
+			op = "enqueue outbound"
+			if outbound == nil {
+				break
+			}
+			queue.enqueue(outbound)
 
 		case <-refreshConnsTicker.C:
 			op = "refresh"
@@ -479,6 +499,10 @@ func startTCP(
 					), EvTCP, EvTCPListenerClosed)
 				}
 			}
+
+		case <-queue.timer.C:
+			op = "queue tick"
+			queue.tick()
 
 		case <-closing:
 			for _, ln := range listeners {
