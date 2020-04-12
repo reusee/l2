@@ -179,7 +179,6 @@ func startICMP(
 			for _, remote := range remotes {
 				skip := false
 				ipMatched := false
-				addrMatched := false
 				if len(remote.IPs) == 0 {
 					skip = true
 				}
@@ -201,7 +200,7 @@ func startICMP(
 					continue
 				}
 
-				if ipMatched || addrMatched {
+				if ipMatched {
 					r = remote
 					break
 				}
@@ -218,13 +217,10 @@ func startICMP(
 			seq++
 			msg := &icmp.Message{
 				Type: msgType,
-				Body: &EchoBody{
-					Echo: &icmp.Echo{
-						ID:   int(r.ID),
-						Seq:  seq,
-						Data: data,
-					},
-					b: data,
+				Body: &icmp.Echo{
+					ID:   int(r.ID),
+					Seq:  seq,
+					Data: data,
 				},
 			}
 			payload, err := msg.Marshal(nil)
@@ -233,6 +229,10 @@ func startICMP(
 			if _, err := localConn.WriteTo(payload, &net.IPAddr{
 				IP: r.IP,
 			}); err != nil {
+				trigger(scope.Sub(
+					&r,
+				), EvICMP, EvICMPWriteError)
+				return
 			}
 
 			if !sent {
@@ -321,16 +321,4 @@ func startICMP(
 		}
 	}
 
-}
-
-type EchoBody struct {
-	*icmp.Echo
-	b []byte
-}
-
-func (p *EchoBody) Marshal(proto int) ([]byte, error) {
-	binary.BigEndian.PutUint16(p.b[:2], uint16(p.ID))
-	binary.BigEndian.PutUint16(p.b[2:4], uint16(p.Seq))
-	copy(p.b[4:], p.Data)
-	return p.b, nil
 }
