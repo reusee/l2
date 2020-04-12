@@ -119,7 +119,15 @@ func startICMP(
 			r := bytes.NewReader(bs)
 			for {
 				var length uint16
-				if err := binary.Read(r, binary.LittleEndian, &length); err != nil {
+				if err := binary.Read(r, binary.LittleEndian, &length); is(err, io.EOF) {
+					break
+				} else if err != nil {
+					trigger(scope.Sub(
+						&localConn, &err,
+					), EvUDP, EvICMPReadInboundError)
+					break
+				}
+				if length == 0 {
 					break
 				}
 				inbound, err := network.readInbound(
@@ -306,6 +314,9 @@ func startICMP(
 				break
 			}
 			queue.enqueue(outbound)
+
+		case <-queue.timer.C:
+			queue.tick()
 
 		}
 	}

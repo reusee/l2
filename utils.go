@@ -3,6 +3,7 @@ package l2
 import (
 	crand "crypto/rand"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"hash/fnv"
 	"math/rand"
@@ -17,6 +18,7 @@ var (
 	pt     = fmt.Printf
 	me     = e.Default.WithStack()
 	ce, he = e.New(me)
+	is     = errors.Is
 )
 
 type (

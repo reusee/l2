@@ -161,7 +161,15 @@ func startUDP(
 				r := bytes.NewReader(bs[:n])
 				for {
 					var length uint16
-					if err := binary.Read(r, binary.LittleEndian, &length); err != nil {
+					if err := binary.Read(r, binary.LittleEndian, &length); is(err, io.EOF) {
+						break
+					} else if err != nil {
+						trigger(scope.Sub(
+							&local, &err,
+						), EvUDP, EvUDPReadInboundError)
+						return
+					}
+					if length == 0 {
 						break
 					}
 					inbound, err := network.readInbound(
