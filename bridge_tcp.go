@@ -362,12 +362,6 @@ func startTCP(
 	close(ready)
 	trigger(scope, EvTCP, EvTCPReady)
 
-	type qKey struct {
-		IPLen   int
-		IP      [16]byte
-		HasAddr bool
-		Addr    [6]byte
-	}
 	queue := newSendQueue(
 		network,
 		func(ip *net.IP, addr *net.HardwareAddr, data []byte) {

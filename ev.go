@@ -45,6 +45,7 @@ const (
 	EvICMPClosed
 	EvICMPNotSent
 	EvICMPInboundSent
+	EvICMPReadInboundError
 
 	EvNetwork
 	EvNetworkClosing

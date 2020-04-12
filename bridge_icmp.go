@@ -3,6 +3,7 @@ package l2
 import (
 	"bytes"
 	"encoding/binary"
+	"io"
 	"net"
 
 	"github.com/google/gopacket"
@@ -114,15 +115,32 @@ func startICMP(
 			}
 			id := binary.BigEndian.Uint16(payload[4:6])
 			bs := payload[8:]
-			inbound, err := network.readInbound(bytes.NewReader(bs))
-			if err != nil {
-				continue
+
+			r := bytes.NewReader(bs)
+			for {
+				var length uint16
+				if err := binary.Read(r, binary.LittleEndian, &length); err != nil {
+					break
+				}
+				inbound, err := network.readInbound(
+					&io.LimitedReader{
+						R: r,
+						N: int64(length),
+					},
+				)
+				if err != nil {
+					trigger(scope.Sub(
+						&localConn, &err,
+					), EvUDP, EvICMPReadInboundError)
+					break
+				}
+				inbounds <- ICMPInbound{
+					Addr:    addr.(*net.IPAddr),
+					ID:      id,
+					Inbound: inbound,
+				}
 			}
-			inbounds <- ICMPInbound{
-				Addr:    addr.(*net.IPAddr),
-				ID:      id,
-				Inbound: inbound,
-			}
+
 		}
 	})
 
@@ -144,6 +162,78 @@ func startICMP(
 	} else {
 		msgType = netipv4.ICMPTypeEcho
 	}
+
+	queue := newSendQueue(
+		network,
+		func(ip *net.IP, addr *net.HardwareAddr, data []byte) {
+			sent := false
+			var r *ICMPRemote
+			for _, remote := range remotes {
+				skip := false
+				ipMatched := false
+				addrMatched := false
+				if len(remote.IPs) == 0 {
+					skip = true
+				}
+				if ip != nil && len(remote.IPs) > 0 {
+					ok := false
+					for _, remoteIP := range remote.IPs {
+						if remoteIP.Equal(*ip) {
+							ok = true
+							break
+						}
+					}
+					if !ok {
+						skip = true
+					} else {
+						ipMatched = true
+					}
+				}
+				if skip {
+					continue
+				}
+
+				if ipMatched || addrMatched {
+					r = remote
+					break
+				}
+			}
+
+			if r == nil {
+				trigger(scope.Sub(
+					&remotes,
+				), EvICMP, EvICMPNotSent)
+				return
+			}
+
+			// sent
+			seq++
+			msg := &icmp.Message{
+				Type: msgType,
+				Body: &EchoBody{
+					Echo: &icmp.Echo{
+						ID:   int(r.ID),
+						Seq:  seq,
+						Data: data,
+					},
+					b: data,
+				},
+			}
+			payload, err := msg.Marshal(nil)
+			ce(err)
+			<-localConnOK
+			if _, err := localConn.WriteTo(payload, &net.IPAddr{
+				IP: r.IP,
+			}); err != nil {
+			}
+
+			if !sent {
+				trigger(scope.Sub(
+					&r, &remotes,
+				), EvICMP, EvICMPNotSent)
+			}
+		},
+	)
 
 	for {
 		select {
@@ -215,77 +305,7 @@ func startICMP(
 			if outbound == nil {
 				break
 			}
-
-			sent := false
-			var r *ICMPRemote
-			for _, remote := range remotes {
-				skip := false
-				ipMatched := false
-				addrMatched := false
-				if len(remote.IPs) == 0 {
-					skip = true
-				}
-				ip := outbound.DestIP
-				if ip != nil && len(remote.IPs) > 0 {
-					ok := false
-					for _, remoteIP := range remote.IPs {
-						if remoteIP.Equal(*ip) {
-							ok = true
-							break
-						}
-					}
-					if !ok {
-						skip = true
-					} else {
-						ipMatched = true
-					}
-				}
-				if skip {
-					continue
-				}
-
-				if ipMatched || addrMatched {
-					r = remote
-					break
-				}
-			}
-
-			if r == nil {
-				trigger(scope.Sub(
-					&remotes,
-				), EvICMP, EvICMPNotSent)
-				break
-			}
-
-			// sent
-			buf := new(bytes.Buffer)
-			ce(network.writeOutbound(buf, outbound))
-			bs := make([]byte, 4+buf.Len())
-			seq++
-			msg := &icmp.Message{
-				Type: msgType,
-				Body: &EchoBody{
-					Echo: &icmp.Echo{
-						ID:   int(r.ID),
-						Seq:  seq,
-						Data: buf.Bytes(),
-					},
-					b: bs,
-				},
-			}
-			payload, err := msg.Marshal(nil)
-			ce(err)
-			<-localConnOK
-			if _, err := localConn.WriteTo(payload, &net.IPAddr{
-				IP: r.IP,
-			}); err != nil {
-			}
-
-			if !sent {
-				trigger(scope.Sub(
-					&r, &remotes,
-				), EvICMP, EvICMPNotSent)
-			}
+			queue.enqueue(outbound)
 
 		}
 	}

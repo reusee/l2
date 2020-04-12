@@ -206,10 +206,6 @@ func startUDP(
 	parser.AddDecodingLayer(&arp)
 	decoded := make([]gopacket.LayerType, 0, 10)
 
-	type queueK struct {
-		remote *UDPRemote
-	}
-
 	queue := newSendQueue(
 		network,
 		func(ip *net.IP, addr *net.HardwareAddr, data []byte) {
