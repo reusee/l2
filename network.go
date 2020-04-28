@@ -280,6 +280,13 @@ func (n *Network) Start(fns ...dyn) (err error) {
 	outboundSenderGroup := new(sync.WaitGroup)
 	outboundSenderGroup.Add(1)
 
+	type ActiveKey struct {
+		Addr        [6]byte
+		BridgeIndex uint8
+	}
+	// map[ActiveKey]time.Time
+	var lastActive sync.Map
+
 	// interface -> bridge
 	spawn(scope, func() {
 		defer outboundSenderGroup.Done()
@@ -393,12 +400,42 @@ func (n *Network) Start(fns ...dyn) (err error) {
 			jobs <- func() {
 				ce(outbound.encode(n.CryptoKey, n.CryptoKeyInt))
 			}
-			for _, ch := range outboundChans {
-				select {
-				case ch <- outbound:
-				case <-closing:
+
+			// select bridge
+			preferBridge := -1
+			var t time.Time
+			if outbound.DestAddr != nil {
+				var addr [6]byte
+				copy(addr[:], *outbound.DestAddr)
+				for i := 0; i < len(outboundChans); i++ {
+					key := ActiveKey{
+						Addr:        addr,
+						BridgeIndex: uint8(i),
+					}
+					if v, ok := lastActive.Load(key); ok {
+						if last := v.(time.Time); time.Since(last) < time.Second &&
+							last.After(t) {
+							t = last
+							preferBridge = i
+						}
+					}
 				}
 			}
+
+			if preferBridge >= 0 {
+				select {
+				case outboundChans[preferBridge] <- outbound:
+				case <-closing:
+				}
+			} else {
+				for _, ch := range outboundChans {
+					select {
+					case ch <- outbound:
+					case <-closing:
+					}
+				}
+			}
+
 			trigger(scope.Sub(
 				&outbound,
 			), EvNetwork, EvNetworkOutboundSent)
@@ -464,6 +501,7 @@ func (n *Network) Start(fns ...dyn) (err error) {
 
 				parser.DecodeLayers(inbound.Eth, &decoded)
 
+				var fromAddr [6]byte
 				for _, t := range decoded {
 					switch t {
 
@@ -485,6 +523,7 @@ func (n *Network) Start(fns ...dyn) (err error) {
 							}
 							m[inbound.Serial%(1<<17)] = inbound.Serial
 						}
+						copy(fromAddr[:], eth.SrcMAC)
 
 					}
 				}
@@ -503,6 +542,11 @@ func (n *Network) Start(fns ...dyn) (err error) {
 						&inbound,
 					), EvNetwork, EvNetworkInboundWritten)
 				}
+				key := ActiveKey{
+					Addr:        fromAddr,
+					BridgeIndex: inbound.BridgeIndex,
+				}
+				lastActive.Store(key, time.Now())
 
 			case bs := <-n.InjectFrame:
 				_, _ = n.iface.Write(bs)
