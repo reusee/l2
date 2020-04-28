@@ -12,6 +12,7 @@ import (
 	"sync"
 	"unsafe"
 
+	"github.com/golang/snappy"
 	"github.com/reusee/sb"
 	"golang.org/x/crypto/chacha20poly1305"
 	"golang.org/x/crypto/poly1305"
@@ -75,7 +76,7 @@ func (outbound *Outbound) encode(key []byte, keyInt uint64) error {
 			outbound.err = err
 			return
 		}
-		plaintext := bs.Bytes()
+		plaintext := snappy.Encode(nil, bs.Bytes())
 
 		var buf []byte
 		switch outbound.PreferFormat {
@@ -230,8 +231,13 @@ func (n *Network) readInbound(r io.Reader) (inbound *Inbound, err error) {
 	}
 
 	inbound = new(Inbound)
+	var bs []byte
+	bs, err = snappy.Decode(nil, plaintext)
+	if err != nil {
+		return
+	}
 	if err = sb.Copy(
-		sb.Decode(bytes.NewReader(plaintext)),
+		sb.Decode(bytes.NewReader(bs)),
 		sb.Unmarshal(func(bs []byte, serial uint64) {
 			inbound.WireData.Eth = bs
 			inbound.WireData.Serial = serial
