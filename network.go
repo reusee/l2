@@ -284,8 +284,8 @@ func (n *Network) Start(fns ...dyn) (err error) {
 		Addr        [6]byte
 		BridgeIndex uint8
 	}
-	// map[ActiveKey]time.Time
-	var lastActive sync.Map
+	lastActive := make(map[ActiveKey]time.Time)
+	lastActiveL := new(sync.RWMutex)
 
 	// interface -> bridge
 	spawn(scope, func() {
@@ -412,12 +412,12 @@ func (n *Network) Start(fns ...dyn) (err error) {
 						Addr:        addr,
 						BridgeIndex: uint8(i),
 					}
-					if v, ok := lastActive.Load(key); ok {
-						if last := v.(time.Time); time.Since(last) < time.Second &&
-							last.After(t) {
-							t = last
-							preferBridge = i
-						}
+					lastActiveL.RLock()
+					last, ok := lastActive[key]
+					lastActiveL.RUnlock()
+					if ok && last.After(t) && time.Since(last) < time.Second {
+						t = last
+						preferBridge = i
 					}
 				}
 			}
@@ -541,12 +541,14 @@ func (n *Network) Start(fns ...dyn) (err error) {
 					trigger(scope.Sub(
 						&inbound,
 					), EvNetwork, EvNetworkInboundWritten)
+					key := ActiveKey{
+						Addr:        fromAddr,
+						BridgeIndex: inbound.BridgeIndex,
+					}
+					lastActiveL.Lock()
+					lastActive[key] = time.Now()
+					lastActiveL.Unlock()
 				}
-				key := ActiveKey{
-					Addr:        fromAddr,
-					BridgeIndex: inbound.BridgeIndex,
-				}
-				lastActive.Store(key, time.Now())
 
 			case bs := <-n.InjectFrame:
 				_, _ = n.iface.Write(bs)
