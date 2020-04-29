@@ -16,10 +16,8 @@ var availableBridges = map[string]Bridge{
 	},
 }
 
-var allBridgeNames = func() []string {
-	var names []string
-	for name := range availableBridges {
-		names = append(names, name)
-	}
-	return names
-}()
+var allBridgeNames = []string{
+	"ICMP",
+	"TCP",
+	"UDP",
+}

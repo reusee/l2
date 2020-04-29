@@ -402,11 +402,11 @@ func (n *Network) Start(fns ...dyn) (err error) {
 			}
 
 			// select bridge
-			preferBridge := -1
-			var t time.Time
+			sent := false
 			if outbound.DestAddr != nil {
 				var addr [6]byte
 				copy(addr[:], *outbound.DestAddr)
+			loop_bridges:
 				for i := 0; i < len(outboundChans); i++ {
 					key := ActiveKey{
 						Addr:        addr,
@@ -415,19 +415,17 @@ func (n *Network) Start(fns ...dyn) (err error) {
 					lastActiveL.RLock()
 					last, ok := lastActive[key]
 					lastActiveL.RUnlock()
-					if ok && last.After(t) && time.Since(last) < time.Second {
-						t = last
-						preferBridge = i
+					if ok && time.Since(last) < time.Second {
+						select {
+						case outboundChans[i] <- outbound:
+							sent = true
+							break loop_bridges
+						case <-closing:
+						}
 					}
 				}
 			}
-
-			if preferBridge >= 0 {
-				select {
-				case outboundChans[preferBridge] <- outbound:
-				case <-closing:
-				}
-			} else {
+			if !sent {
 				for _, ch := range outboundChans {
 					select {
 					case ch <- outbound:
