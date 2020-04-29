@@ -10,6 +10,7 @@ import (
 	"math/rand"
 	"net"
 	"sync"
+	"time"
 	"unsafe"
 
 	"github.com/golang/snappy"
@@ -48,6 +49,8 @@ type Inbound struct {
 	WireData
 	DestAddr    *net.HardwareAddr
 	BridgeIndex uint8
+
+	enqueueAt time.Time
 }
 
 func (n *Network) writeOutbound(w io.Writer, outbound *Outbound) (err error) {

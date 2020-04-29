@@ -2,6 +2,7 @@ package l2
 
 import (
 	"bytes"
+	"container/heap"
 	"encoding/binary"
 	"hash/fnv"
 	"io"
@@ -305,7 +306,7 @@ func (n *Network) Start(fns ...dyn) (err error) {
 		parser.AddDecodingLayer(&tcp)
 		parser.AddDecodingLayer(&udp)
 		decoded := make([]gopacket.LayerType, 0, 10)
-		serial := rand.Uint64()
+		serials := make(map[[6]byte]uint64)
 		frameScope := scope.Sub(
 			func() (
 				*layers.Ethernet,
@@ -374,7 +375,18 @@ func (n *Network) Start(fns ...dyn) (err error) {
 				n.OnFrame(bs)
 			}
 
-			sn := atomic.AddUint64(&serial, 1)
+			var sn uint64
+			if destAddr != nil {
+				var mac [6]byte
+				copy(mac[:], *destAddr)
+				n, ok := serials[mac]
+				if !ok {
+					n = rand.Uint64()
+					serials[mac] = n
+				}
+				sn = n + 1
+				serials[mac]++
+			}
 
 			ethBytes := make([]byte, l)
 			copy(ethBytes, bs)
@@ -470,6 +482,23 @@ func (n *Network) Start(fns ...dyn) (err error) {
 		closing Closing,
 	) {
 
+		write := func(inbound *Inbound) {
+			if inbound.DestAddr != nil &&
+				!bytes.Equal(*inbound.DestAddr, EthernetBroadcast) &&
+				!bytes.Equal(*inbound.DestAddr, ifaceHardwareAddr) {
+				return
+			}
+			doChan <- func() {
+				_, err := n.iface.Write(inbound.Eth)
+				if err != nil {
+					return
+				}
+				trigger(scope.Sub(
+					&inbound,
+				), EvNetwork, EvNetworkInboundWritten)
+			}
+		}
+
 		parser := gopacket.NewDecodingLayerParser(layers.LayerTypeEthernet)
 		parser.SetDecodingLayerContainer(gopacket.DecodingLayerSparse(nil))
 		var eth layers.Ethernet
@@ -479,10 +508,12 @@ func (n *Network) Start(fns ...dyn) (err error) {
 		parser.AddDecodingLayer(&arp)
 		parser.AddDecodingLayer(&ipv4)
 		decoded := make([]gopacket.LayerType, 0, 10)
-		dedup := make(map[uint64][]uint64)
-		macBytes := make([]byte, 8)
 
-	loop_inbound:
+		queue := make(map[[6]byte]*InboundQueue)
+		lastSerial := make(map[[6]byte]uint64)
+		queueNotEmpty := false
+		timer := time.NewTimer(time.Millisecond)
+
 		for {
 			select {
 
@@ -501,53 +532,91 @@ func (n *Network) Start(fns ...dyn) (err error) {
 
 				parser.DecodeLayers(inbound.Eth, &decoded)
 
-				var fromAddr [6]byte
 				for _, t := range decoded {
 					switch t {
 
 					case layers.LayerTypeEthernet:
-						// de-duplicate
-						if inbound.Serial > 0 {
-							copy(macBytes, eth.SrcMAC)
-							macInt := binary.LittleEndian.Uint64(macBytes)
-							m, ok := dedup[macInt]
-							if !ok {
-								m = make([]uint64, 1<<17)
-								dedup[macInt] = m
-							}
-							if m[inbound.Serial%(1<<17)] == inbound.Serial {
-								trigger(scope.Sub(
-									&inbound,
-								), EvNetwork, EvNetworkInboundDuplicated)
-								continue loop_inbound
-							}
-							m[inbound.Serial%(1<<17)] = inbound.Serial
+						var mac [6]byte
+						copy(mac[:], eth.SrcMAC)
+
+						key := ActiveKey{
+							Addr:        mac,
+							BridgeIndex: inbound.BridgeIndex,
 						}
-						copy(fromAddr[:], eth.SrcMAC)
+						lastActiveL.Lock()
+						lastActive[key] = time.Now()
+						lastActiveL.Unlock()
+
+						if inbound.Serial > 0 {
+
+							if inbound.Serial == lastSerial[mac]+1 {
+								// in order
+								lastSerial[mac] = inbound.Serial
+								write(inbound)
+								// pop
+								q, ok := queue[mac]
+								if ok {
+									for len(*q) > 0 && (*q)[0].Serial == lastSerial[mac]+1 {
+										inbound := heap.Pop(q).(*Inbound)
+										lastSerial[mac] = inbound.Serial
+										write(inbound)
+									}
+								}
+
+							} else if inbound.Serial <= lastSerial[mac] {
+								// duplicated, ignore
+
+							} else {
+								// enqueue
+								q, ok := queue[mac]
+								if !ok {
+									q = new(InboundQueue)
+									heap.Init(q)
+									queue[mac] = q
+								}
+								inbound.enqueueAt = time.Now()
+								heap.Push(q, inbound)
+								queueNotEmpty = true
+								if !timer.Stop() {
+									select {
+									case <-timer.C:
+									default:
+									}
+								}
+								timer.Reset(time.Millisecond)
+							}
+
+						} else {
+							// no serial
+							write(inbound)
+						}
 
 					}
 				}
 
-				if inbound.DestAddr != nil &&
-					!bytes.Equal(*inbound.DestAddr, EthernetBroadcast) &&
-					!bytes.Equal(*inbound.DestAddr, ifaceHardwareAddr) {
-					break
+			case <-func() <-chan time.Time {
+				if queueNotEmpty {
+					return timer.C
 				}
-				doChan <- func() {
-					_, err := n.iface.Write(inbound.Eth)
-					if err != nil {
-						return
+				return nil
+			}():
+				allEmpty := true
+				for mac, q := range queue {
+					for len(*q) > 0 {
+						if time.Since((*q)[0].enqueueAt) > time.Millisecond*10 {
+							inbound := heap.Pop(q).(*Inbound)
+							lastSerial[mac] = inbound.Serial
+							write(inbound)
+						}
 					}
-					trigger(scope.Sub(
-						&inbound,
-					), EvNetwork, EvNetworkInboundWritten)
-					key := ActiveKey{
-						Addr:        fromAddr,
-						BridgeIndex: inbound.BridgeIndex,
+					if len(*q) > 0 {
+						allEmpty = false
 					}
-					lastActiveL.Lock()
-					lastActive[key] = time.Now()
-					lastActiveL.Unlock()
+				}
+				if allEmpty {
+					queueNotEmpty = false
+				} else {
+					timer.Reset(time.Millisecond)
 				}
 
 			case bs := <-n.InjectFrame:
