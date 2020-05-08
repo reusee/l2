@@ -402,44 +402,35 @@ func (n *Network) Start(fns ...dyn) (err error) {
 			}
 
 			// select bridge
-			/*
-				sent := false
-				if outbound.DestAddr != nil {
-					var addr [6]byte
-					copy(addr[:], *outbound.DestAddr)
-				loop_bridges:
-					for i := 0; i < len(outboundChans); i++ {
-						key := ActiveKey{
-							Addr:        addr,
-							BridgeIndex: uint8(i),
-						}
-						lastActiveL.RLock()
-						last, ok := lastActive[key]
-						lastActiveL.RUnlock()
-						if ok && time.Since(last) < time.Second {
-							select {
-							case outboundChans[i] <- outbound:
-								sent = true
-								break loop_bridges
-							case <-closing:
-							}
-						}
+			sent := false
+			if outbound.DestAddr != nil {
+				var addr [6]byte
+				copy(addr[:], *outbound.DestAddr)
+			loop_bridges:
+				for i := 0; i < len(outboundChans); i++ {
+					key := ActiveKey{
+						Addr:        addr,
+						BridgeIndex: uint8(i),
 					}
-				}
-				if !sent {
-					for _, ch := range outboundChans {
+					lastActiveL.RLock()
+					last, ok := lastActive[key]
+					lastActiveL.RUnlock()
+					if ok && time.Since(last) < time.Second {
 						select {
-						case ch <- outbound:
+						case outboundChans[i] <- outbound:
+							sent = true
+							break loop_bridges
 						case <-closing:
 						}
 					}
 				}
-			*/
-
-			for _, ch := range outboundChans {
-				select {
-				case ch <- outbound:
-				case <-closing:
+			}
+			if !sent {
+				for _, ch := range outboundChans {
+					select {
+					case ch <- outbound:
+					case <-closing:
+					}
 				}
 			}
 
