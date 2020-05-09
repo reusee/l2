@@ -18,6 +18,6 @@ var availableBridges = map[string]Bridge{
 
 var allBridgeNames = []string{
 	"UDP",
-	"ICMP",
+	//"ICMP",
 	"TCP",
 }
