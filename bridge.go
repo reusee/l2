@@ -11,13 +11,13 @@ var availableBridges = map[string]Bridge{
 	"UDP": {
 		Start: startUDP,
 	},
-	"ICMP": {
-		Start: startICMP,
-	},
+	//"ICMP": {
+	//	Start: startICMP,
+	//},
 }
 
 var allBridgeNames = []string{
 	"UDP",
 	"TCP",
-	"ICMP",
+	//"ICMP",
 }
