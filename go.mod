@@ -8,13 +8,13 @@ require (
 	github.com/google/gopacket v1.1.18-0.20190926102631-33810c487ced
 	github.com/reusee/dscope v0.0.0-20200418031158-6bff81142d6b
 	github.com/reusee/e/v2 v2.3.3
-	github.com/reusee/sb v0.0.0-20200417080255-71c4f7d482b5
+	github.com/reusee/sb v0.0.0-20200512080448-e1a8b51dc3ed
 	github.com/songgao/water v0.0.0-20200317203138-2b4b6d7c09d8
 	github.com/stretchr/testify v1.4.0 // indirect
 	github.com/vishvananda/netlink v1.1.0
 	github.com/vishvananda/netns v0.0.0-20191106174202-0a2b9b5464df
-	golang.org/x/crypto v0.0.0-20200423211502-4bdfaf469ed5
-	golang.org/x/net v0.0.0-20200425230154-ff2c4b7c35a0
-	golang.org/x/sys v0.0.0-20200420163511-1957bb5e6d1f
+	golang.org/x/crypto v0.0.0-20200510223506-06a226fb4e37
+	golang.org/x/net v0.0.0-20200513185701-a91f0712d120
+	golang.org/x/sys v0.0.0-20200515095857-1151b9dac4a9
 	golang.org/x/text v0.3.2
 )
