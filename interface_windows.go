@@ -49,6 +49,8 @@ func (n *Network) SetupInterface() {
 	).CombinedOutput()
 	ce(err, string(fromGBK(out)))
 
+	//TODO use consistent MAC
+
 	out, err = exec.Command("netsh", "interface", "ipv4", "set", "subinterface",
 		iface.Name(),
 		fmt.Sprintf(`mtu=%d`, n.MTU),

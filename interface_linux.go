@@ -23,6 +23,8 @@ func (n *Network) SetupInterface() {
 
 	link, err := netlink.LinkByName(iface.Name())
 	ce(err)
+	hwAddr := ip2Mac(n.LocalNode.LanIP)
+	ce(netlink.LinkSetHardwareAddr(link, hwAddr))
 	err = netlink.LinkSetUp(link)
 	ce(err)
 	err = netlink.AddrAdd(link, &netlink.Addr{

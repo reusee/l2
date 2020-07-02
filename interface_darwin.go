@@ -81,6 +81,8 @@ func (n *Network) SetupInterface() {
 	).CombinedOutput()
 	ce(err, out)
 
+	//TODO use consistent MAC
+
 	f, err := os.OpenFile("/dev/bpf2", os.O_RDWR, 0755)
 	ce(err)
 	bpfFD := f.Fd()

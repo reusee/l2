@@ -13,12 +13,12 @@ import (
 
 func TestPingPongAllInitNodesUDP(t *testing.T) {
 	node1 := &Node{
-		LanIP:       net.IPv4(192, 168, 244, 1),
+		LanIP:       net.IPv4(192, 168, 244, 4),
 		WanHost:     "localhost",
 		BridgeNames: []string{"UDP"},
 	}
 	node2 := &Node{
-		LanIP:       net.IPv4(192, 168, 244, 2),
+		LanIP:       net.IPv4(192, 168, 244, 5),
 		WanHost:     "localhost",
 		BridgeNames: []string{"UDP"},
 		ID:          2,
@@ -60,7 +60,7 @@ func TestPingPongAllInitNodesUDP(t *testing.T) {
 
 func TestPingPongOneRandomNodeUDP(t *testing.T) {
 	node1 := &Node{
-		LanIP:       net.IPv4(192, 168, 244, 1),
+		LanIP:       net.IPv4(192, 168, 244, 6),
 		WanHost:     "localhost",
 		BridgeNames: []string{"UDP"},
 	}

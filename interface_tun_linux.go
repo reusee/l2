@@ -48,7 +48,6 @@ func (n *Network) SetupInterface() {
 
 type fakeTAP struct {
 	iface *water.Interface
-	ipMac sync.Map
 }
 
 func (f *fakeTAP) Close() error {
@@ -72,31 +71,14 @@ func (f *fakeTAP) Read(buf []byte) (n int, err error) {
 	parser.AddDecodingLayer(&ipv4)
 	decoded := make([]gopacket.LayerType, 0, 1)
 	parser.DecodeLayers(buf[14:n], &decoded)
-	dstMac := f.ip2Mac(ipv4.DstIP)
+	dstMac := ip2Mac(ipv4.DstIP)
 	copy(buf[:6], dstMac)
-	srcMac := f.ip2Mac(ipv4.SrcIP)
+	srcMac := ip2Mac(ipv4.SrcIP)
 	copy(buf[6:12], srcMac)
 	buf[12] = 8
 	buf[13] = 0
 
 	return
-}
-
-func (f *fakeTAP) ip2Mac(ip net.IP) net.HardwareAddr {
-	if ip.IsMulticast() {
-		return EthernetBroadcast
-	}
-	if v, ok := f.ipMac.Load(ip.String()); ok {
-		return v.(net.HardwareAddr)
-	}
-	h := sha256.New()
-	h.Write(ip)
-	sum := h.Sum(nil)
-	mac := make(net.HardwareAddr, 6)
-	copy(mac, sum[:6])
-	f.ipMac.Store(ip.String(), mac)
-	return mac
-
 }
 
 func (f *fakeTAP) Write(buf []byte) (n int, err error) {
