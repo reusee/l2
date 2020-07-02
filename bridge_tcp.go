@@ -43,7 +43,6 @@ func startTCP(
 	getTime func() time.Time,
 	trigger Trigger,
 	bridgeIndex BridgeIndex,
-	ifaceAddr net.HardwareAddr,
 	localAddrs []net.Addr,
 ) {
 

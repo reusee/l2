@@ -1,3 +1,5 @@
+// +build !l2tp
+
 package l2
 
 import (

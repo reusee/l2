@@ -151,9 +151,12 @@ func (n *Network) Start(fns ...dyn) (err error) {
 		n.MTU = 1300
 	}
 	n.SetupInterface()
-	netInterface, err := net.InterfaceByName(n.iface.Name())
-	ce(err)
-	ifaceHardwareAddr := netInterface.HardwareAddr
+	var ifaceHardwareAddr net.HardwareAddr
+	if name := n.iface.Name(); name != "" {
+		netInterface, err := net.InterfaceByName(n.iface.Name())
+		ce(err)
+		ifaceHardwareAddr = netInterface.HardwareAddr
+	}
 
 	// utils
 	var getTime = func() func() time.Time {
@@ -221,7 +224,6 @@ func (n *Network) Start(fns ...dyn) (err error) {
 		&closing,
 		&n,
 		&getTime,
-		&ifaceHardwareAddr,
 		&ifaceAddrs,
 	)
 	n.Scope = scope
@@ -537,6 +539,7 @@ func (n *Network) Start(fns ...dyn) (err error) {
 
 				if inbound.DestAddr != nil &&
 					!bytes.Equal(*inbound.DestAddr, EthernetBroadcast) &&
+					len(ifaceHardwareAddr) > 0 &&
 					!bytes.Equal(*inbound.DestAddr, ifaceHardwareAddr) {
 					break
 				}
