@@ -3,10 +3,8 @@
 package l2
 
 import (
-	"crypto/sha256"
 	"fmt"
 	"net"
-	"sync"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
