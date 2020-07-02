@@ -1,4 +1,4 @@
-// +build !l2tp
+// +build !tun
 
 package l2
 
