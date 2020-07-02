@@ -100,6 +100,7 @@ func (f *fakeTAP) ip2Mac(ip net.IP) net.HardwareAddr {
 }
 
 func (f *fakeTAP) Write(buf []byte) (n int, err error) {
+	// must be ip packet, no need to filter
 	n, err = f.iface.Write(buf[14:])
 	if err != nil {
 		return
