@@ -50,6 +50,7 @@ func (n *Network) SetupInterface() {
 	ce(err, string(fromGBK(out)))
 
 	//TODO use consistent MAC
+	//TODO set MACs
 
 	out, err = exec.Command("netsh", "interface", "ipv4", "set", "subinterface",
 		iface.Name(),

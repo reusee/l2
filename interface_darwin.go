@@ -82,6 +82,7 @@ func (n *Network) SetupInterface() {
 	ce(err, out)
 
 	//TODO use consistent MAC
+	//TODO set MACs
 
 	f, err := os.OpenFile("/dev/bpf2", os.O_RDWR, 0755)
 	ce(err)
