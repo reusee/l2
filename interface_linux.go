@@ -39,7 +39,5 @@ func (n *Network) SetupInterface() {
 	err = netlink.SetPromiscOn(link)
 	ce(err)
 
-	//TODO set MACs
-
 	n.iface = iface
 }
