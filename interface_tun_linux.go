@@ -80,11 +80,31 @@ func (f *fakeTAP) Read(buf []byte) (n int, err error) {
 }
 
 func (f *fakeTAP) Write(buf []byte) (n int, err error) {
-	// must be ip packet, no need to filter
-	n, err = f.iface.Write(buf[14:])
-	if err != nil {
-		return
+	parser := gopacket.NewDecodingLayerParser(layers.LayerTypeEthernet)
+	var eth layers.Ethernet
+	var ipv4 layers.IPv4
+	var arp layers.ARP
+	parser.AddDecodingLayer(&eth)
+	parser.AddDecodingLayer(&ipv4)
+	parser.AddDecodingLayer(&arp)
+	decoded := make([]gopacket.LayerType, 0, 5)
+	parser.DecodeLayers(buf, &decoded)
+	for _, t := range decoded {
+		switch t {
+		case layers.LayerTypeEthernet:
+
+		case layers.LayerTypeIPv4:
+			n, err = f.iface.Write(buf[14:])
+			if err != nil {
+				return
+			}
+			n += 14
+			return n, nil
+
+		case layers.LayerTypeARP:
+
+		}
 	}
-	n += 14
-	return
+
+	return len(buf), nil
 }
