@@ -18,7 +18,7 @@ type Node struct {
 func (n *Node) Init() {
 	// defaults
 	if len(n.BridgeNames) == 0 {
-		n.BridgeNames = allBridgeNames
+		n.BridgeNames = defaultBridgeNames
 	}
 	// lookup host
 	if n.WanHost != "" {

@@ -16,8 +16,8 @@ var availableBridges = map[string]Bridge{
 	},
 }
 
-var allBridgeNames = []string{
+var defaultBridgeNames = []string{
 	"UDP",
 	"TCP",
-	"ICMP",
+	//"ICMP",
 }
