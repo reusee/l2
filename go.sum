@@ -3,8 +3,11 @@ github.com/beevik/ntp v0.3.0/go.mod h1:hIHWr+l3+/clUnF44zdK+CWW7fO8dR5cIylAQ76NR
 github.com/davecgh/go-spew v1.1.0 h1:ZDRjVQ15GmhC3fiQ8ni8+OwkZQO4DARzQgrnXU1Liz8=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/dvyukov/go-fuzz v0.0.0-20191206100749-a378175e205c/go.mod h1:11Gm+ccJnvAhCNLlf5+cS9KjtbaD5I5zaZpFMsTHWTw=
+github.com/dvyukov/go-fuzz v0.0.0-20200916044129-21309f307f61/go.mod h1:11Gm+ccJnvAhCNLlf5+cS9KjtbaD5I5zaZpFMsTHWTw=
 github.com/golang/snappy v0.0.1 h1:Qgr9rKW7uDUkrbSmQeiDsGa8SjGyCOGtuasMWwvp2P4=
 github.com/golang/snappy v0.0.1/go.mod h1:/XxbfmMg8lxefKM7IXC3fBNl/7bRcc72aCRzEWrmP2Q=
+github.com/golang/snappy v0.0.2 h1:aeE13tS0IiQgFjYdoL8qN3K1N2bXXtI6Vi51/y7BpMw=
+github.com/golang/snappy v0.0.2/go.mod h1:/XxbfmMg8lxefKM7IXC3fBNl/7bRcc72aCRzEWrmP2Q=
 github.com/google/gopacket v1.1.18-0.20190926102631-33810c487ced h1:BIKw9t86FwdvLUQhdlibsXxcFyABQ1EHCANv1AZn+1A=
 github.com/google/gopacket v1.1.18-0.20190926102631-33810c487ced/go.mod h1:UdDNZ1OO62aGYVnPhxT1U6aI7ukYtA/kB8vaU0diBUM=
 github.com/google/gopacket v1.1.18 h1:lum7VRA9kdlvBi7/v2p7/zcbkduHaCH/SVVyurs7OpY=
@@ -17,12 +20,16 @@ github.com/reusee/dscope v0.0.0-20200418031158-6bff81142d6b h1:bPmG8cfPxVMY2DyIi
 github.com/reusee/dscope v0.0.0-20200418031158-6bff81142d6b/go.mod h1:3YStua5Cdi2FJixYwigqIUYhARAZ8fQSTSNZ2ZotVA8=
 github.com/reusee/dscope v0.0.0-20200830134613-6624c9fb5ba6 h1:jwHmd+YmyTF+4TLiTfHSRaUMZ2NhYPV4REkoMJNVDCY=
 github.com/reusee/dscope v0.0.0-20200830134613-6624c9fb5ba6/go.mod h1:3YStua5Cdi2FJixYwigqIUYhARAZ8fQSTSNZ2ZotVA8=
+github.com/reusee/dscope v0.0.0-20201013021248-185b0480b623 h1:WsCRLrZdmt2aqLbr69IsqYQ+cKOWzSJR+iDTPqbqk38=
+github.com/reusee/dscope v0.0.0-20201013021248-185b0480b623/go.mod h1:3YStua5Cdi2FJixYwigqIUYhARAZ8fQSTSNZ2ZotVA8=
 github.com/reusee/e/v2 v2.3.3 h1:/voLHd60okWZ1KEaY4Pln877sbxYQJR2qj48bpWyI0I=
 github.com/reusee/e/v2 v2.3.3/go.mod h1:kykJjxDURd5MAGzB+xkwN7WxfuZaotLjTssHtjpi5LQ=
 github.com/reusee/sb v0.0.0-20200512080448-e1a8b51dc3ed h1:ssrehSjKQJBYV2uECwBbhW7wPYow65L/WZ4H6HUQCaU=
 github.com/reusee/sb v0.0.0-20200512080448-e1a8b51dc3ed/go.mod h1:X2132bhIwkn1fc+usHN65wrj+uym0XCF8ZeG1NYAAgo=
 github.com/reusee/sb v0.0.0-20200615060345-d755d8947785 h1:Vvz5VvtDHeJpWABhL5tVFRhVZ6VaNBFYUHgDramdaUg=
 github.com/reusee/sb v0.0.0-20200615060345-d755d8947785/go.mod h1:X2132bhIwkn1fc+usHN65wrj+uym0XCF8ZeG1NYAAgo=
+github.com/reusee/sb v0.0.0-20201015143211-7dd91557eaeb h1:V8Y7osG1TL50kq8D3sSc7ADPxt1j3PKy5lgmeTqFd2U=
+github.com/reusee/sb v0.0.0-20201015143211-7dd91557eaeb/go.mod h1:ok5kIQhpEKlojyuCbSf8XTXYi9flIGfVDeL/4qI4U1Q=
 github.com/songgao/water v0.0.0-20200317203138-2b4b6d7c09d8 h1:TG/diQgUe0pntT/2D9tmUCz4VNwm9MfrtPr0SU2qSX8=
 github.com/songgao/water v0.0.0-20200317203138-2b4b6d7c09d8/go.mod h1:P5HUIBuIWKbyjl083/loAegFkfbFNx5i2qEP4CNbm7E=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
@@ -47,6 +54,8 @@ golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9 h1:psW17arqaxU48Z5kZ0CQnk
 golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9/go.mod h1:LzIPMQfyMNhhGPhUkYOs5KpL4U8rLKemX1yGLhDgUto=
 golang.org/x/crypto v0.0.0-20200820211705-5c72a883971a h1:vclmkQCjlDX5OydZ9wv8rBCcS0QyQY66Mpf/7BZbInM=
 golang.org/x/crypto v0.0.0-20200820211705-5c72a883971a/go.mod h1:LzIPMQfyMNhhGPhUkYOs5KpL4U8rLKemX1yGLhDgUto=
+golang.org/x/crypto v0.0.0-20201012173705-84dcc777aaee h1:4yd7jl+vXjalO5ztz6Vc1VADv+S/80LGJmyl1ROJ2AI=
+golang.org/x/crypto v0.0.0-20201012173705-84dcc777aaee/go.mod h1:LzIPMQfyMNhhGPhUkYOs5KpL4U8rLKemX1yGLhDgUto=
 golang.org/x/lint v0.0.0-20200302205851-738671d3881b/go.mod h1:3xt1FjdF8hUf6vQPIChWIBhFzV8gjjsPE/fR3IyQdNY=
 golang.org/x/mod v0.1.1-0.20191105210325-c90efee705ee/go.mod h1:QqPTAvyqsEbceGzBzNggFXnrqF1CaUcvgkdR5Ot7KZg=
 golang.org/x/net v0.0.0-20190404232315-eb5bcb51f2a3/go.mod h1:t9HGtf8HONx5eT2rtn7q6eTqICYqUVnKs3thJo3Qplg=
@@ -57,6 +66,8 @@ golang.org/x/net v0.0.0-20200625001655-4c5254603344 h1:vGXIOMxbNfDTk/aXCmfdLgkrS
 golang.org/x/net v0.0.0-20200625001655-4c5254603344/go.mod h1:/O7V0waA8r7cgGh81Ro3o1hOxt32SMVPicZroKQ2sZA=
 golang.org/x/net v0.0.0-20200822124328-c89045814202 h1:VvcQYSHwXgi7W+TpUR6A9g6Up98WAHf3f/ulnJ62IyA=
 golang.org/x/net v0.0.0-20200822124328-c89045814202/go.mod h1:/O7V0waA8r7cgGh81Ro3o1hOxt32SMVPicZroKQ2sZA=
+golang.org/x/net v0.0.0-20201010224723-4f7140c49acb h1:mUVeFHoDKis5nxCAzoAi7E8Ghb86EXh/RK6wtvJIqRY=
+golang.org/x/net v0.0.0-20201010224723-4f7140c49acb/go.mod h1:sp8m0HH+o8qH0wwXwYZr8TS3Oi6o0r6Gce1SSxlDquU=
 golang.org/x/sync v0.0.0-20190423024810-112230192c58/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=
 golang.org/x/sys v0.0.0-20190215142949-d0b11bdaac8a/go.mod h1:STP8DvDyc/dI5b8T5hshtkjS+E42TnysNCUPdjciGhY=
 golang.org/x/sys v0.0.0-20190405154228-4b34438f7a67/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
@@ -72,6 +83,9 @@ golang.org/x/sys v0.0.0-20200625212154-ddb9806d33ae h1:Ih9Yo4hSPImZOpfGuA4bR/ORK
 golang.org/x/sys v0.0.0-20200625212154-ddb9806d33ae/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 golang.org/x/sys v0.0.0-20200828194041-157a740278f4 h1:kCCpuwSAoYJPkNc6x0xT9yTtV4oKtARo4RGBQWOfg9E=
 golang.org/x/sys v0.0.0-20200828194041-157a740278f4/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
+golang.org/x/sys v0.0.0-20200930185726-fdedc70b468f/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
+golang.org/x/sys v0.0.0-20201015000850-e3ed0017c211 h1:9UQO31fZ+0aKQOFldThf7BKPMJTiBfWycGh/u3UoO88=
+golang.org/x/sys v0.0.0-20201015000850-e3ed0017c211/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 golang.org/x/text v0.3.0/go.mod h1:NqM8EUOU14njkJ3fqMW+pc6Ldnwhi/IjpwHt7yyuwOQ=
 golang.org/x/text v0.3.2 h1:tW2bmiBqwgJj/UpqtC8EpXEZVYOwU0yG4iWbprSVAcs=
 golang.org/x/text v0.3.2/go.mod h1:bEr9sfX3Q8Zfm5fL9x+3itogRgK3+ptLWKqgva+5dAk=
