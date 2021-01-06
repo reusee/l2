@@ -3,6 +3,7 @@ package l2
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"hash/fnv"
 	"io"
 	"math/rand"
@@ -17,6 +18,7 @@ import (
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/reusee/dscope"
+	"github.com/reusee/e4"
 )
 
 type Interface interface {
@@ -71,9 +73,9 @@ func (n *Network) Start(fns ...dyn) (err error) {
 	var localNode *Node
 	if n.SelectNode != nil {
 		addrs, err := net.InterfaceAddrs()
-		ce(err, "get interface addrs")
+		ce(err, e4.WithInfo("get interface addrs"))
 		hostname, err := os.Hostname()
-		ce(err, "get host name")
+		ce(err, e4.WithInfo("get host name"))
 		dscope.New(
 			func() (
 				[]net.Addr,
@@ -82,7 +84,7 @@ func (n *Network) Start(fns ...dyn) (err error) {
 				return addrs,
 					Hostname(hostname)
 			},
-		).Call(n.SelectNode, &localNode)
+		).Call(n.SelectNode).Assign(&localNode)
 	}
 
 	// random ip node
@@ -244,7 +246,7 @@ func (n *Network) Start(fns ...dyn) (err error) {
 		i := i
 		bridge, ok := availableBridges[name]
 		if !ok {
-			ce(me(nil, "no such bridge: %s", name))
+			ce(fmt.Errorf("no such bridge: %s", name))
 		}
 		outboundCh := make(chan *Outbound, 1024)
 		outboundChans = append(outboundChans, outboundCh)
@@ -329,7 +331,7 @@ func (n *Network) Start(fns ...dyn) (err error) {
 				case <-closing:
 					return
 				default:
-					ce(err, "read from interface")
+					ce(err, e4.WithInfo("read from interface"))
 				}
 			}
 			bs := buf[:l]
@@ -384,7 +386,7 @@ func (n *Network) Start(fns ...dyn) (err error) {
 			preferFormat := WireFormat(0) // default
 			if n.PreferFormat != nil {
 				var format WireFormat
-				frameScope.Call(n.PreferFormat, &format)
+				frameScope.Call(n.PreferFormat).Assign(&format)
 				if format != preferFormat {
 					preferFormat = format
 				}

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 
+	"github.com/reusee/e4"
 	"github.com/songgao/water"
 	"github.com/vishvananda/netlink"
 )
@@ -19,7 +20,7 @@ func (n *Network) SetupInterface() {
 			MultiQueue: true,
 		},
 	})
-	ce(err, "new interface")
+	ce(err, e4.WithInfo("new interface"))
 
 	link, err := netlink.LinkByName(iface.Name())
 	ce(err)

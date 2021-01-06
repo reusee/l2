@@ -11,14 +11,15 @@ import (
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/reusee/dscope"
-	"github.com/reusee/e/v2"
+	"github.com/reusee/e4"
 )
 
 var (
-	pt     = fmt.Printf
-	me     = e.Default.WithStack()
-	ce, he = e.New(me)
-	is     = errors.Is
+	pt = fmt.Printf
+	we = e4.DefaultWrap
+	ce = e4.Check
+	he = e4.Handle
+	is = errors.Is
 )
 
 type (
