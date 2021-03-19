@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"time"
 
+	"github.com/reusee/e4"
 	"github.com/songgao/water"
 	"golang.org/x/text/encoding/simplifiedchinese"
 	"golang.org/x/text/transform"
@@ -20,7 +21,7 @@ func (n *Network) SetupInterface() {
 			ComponentID: "tap0901",
 		},
 	})
-	ce(err, "new interface")
+	ce(err)
 
 	out, err := exec.Command(
 		"netsh",
@@ -35,7 +36,7 @@ func (n *Network) SetupInterface() {
 		"none",
 		"1",
 	).CombinedOutput()
-	ce(err, string(fromGBK(out)))
+	ce(err, e4.WithInfo("%s", fromGBK(out)))
 
 	out, err = exec.Command(
 		"netsh",
@@ -47,7 +48,7 @@ func (n *Network) SetupInterface() {
 		"static",
 		"127.0.0.1",
 	).CombinedOutput()
-	ce(err, string(fromGBK(out)))
+	ce(err, e4.WithInfo("%s", fromGBK(out)))
 
 	//TODO use consistent MAC
 	//TODO set MACs
@@ -57,7 +58,7 @@ func (n *Network) SetupInterface() {
 		fmt.Sprintf(`mtu=%d`, n.MTU),
 		"store=persistent",
 	).CombinedOutput()
-	ce(err, string(fromGBK(out)))
+	ce(err, e4.WithInfo("%s", fromGBK(out)))
 
 	time.Sleep(time.Second * 3)
 
