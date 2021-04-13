@@ -63,7 +63,8 @@ func (n *Network) writeOutbound(w io.Writer, outbound *Outbound) (err error) {
 	return nil
 }
 
-func (outbound *Outbound) encode(key []byte, keyInt uint64) error {
+func (outbound *Outbound) encode(key []byte, keyInt uint64) (err error) {
+	defer he(&err)
 	outbound.encodeOnce.Do(func() {
 		bs := new(bytes.Buffer)
 		if err := sb.Copy(
@@ -162,6 +163,7 @@ func (outbound *Outbound) encode(key []byte, keyInt uint64) error {
 var errBadFrame = fmt.Errorf("bad frame")
 
 func (n *Network) readInbound(r io.Reader) (inbound *Inbound, err error) {
+	defer he(&err)
 	var l uint16
 	if err = binary.Read(r, binary.LittleEndian, &l); err != nil {
 		return
