@@ -73,9 +73,9 @@ func (n *Network) Start(fns ...dyn) (err error) {
 	var localNode *Node
 	if n.SelectNode != nil {
 		addrs, err := net.InterfaceAddrs()
-		ce(err, e4.WithInfo("get interface addrs"))
+		ce(err, e4.NewInfo("get interface addrs"))
 		hostname, err := os.Hostname()
-		ce(err, e4.WithInfo("get host name"))
+		ce(err, e4.NewInfo("get host name"))
 		dscope.New(
 			func() (
 				[]net.Addr,
@@ -331,7 +331,7 @@ func (n *Network) Start(fns ...dyn) (err error) {
 				case <-closing:
 					return
 				default:
-					ce(err, e4.WithInfo("read from interface"))
+					ce(err, e4.NewInfo("read from interface"))
 				}
 			}
 			bs := buf[:l]

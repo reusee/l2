@@ -36,7 +36,7 @@ func (n *Network) SetupInterface() {
 		"none",
 		"1",
 	).CombinedOutput()
-	ce(err, e4.WithInfo("%s", fromGBK(out)))
+	ce(err, e4.NewInfo("%s", fromGBK(out)))
 
 	out, err = exec.Command(
 		"netsh",
@@ -48,7 +48,7 @@ func (n *Network) SetupInterface() {
 		"static",
 		"127.0.0.1",
 	).CombinedOutput()
-	ce(err, e4.WithInfo("%s", fromGBK(out)))
+	ce(err, e4.NewInfo("%s", fromGBK(out)))
 
 	//TODO use consistent MAC
 	//TODO set MACs
@@ -58,7 +58,7 @@ func (n *Network) SetupInterface() {
 		fmt.Sprintf(`mtu=%d`, n.MTU),
 		"store=persistent",
 	).CombinedOutput()
-	ce(err, e4.WithInfo("%s", fromGBK(out)))
+	ce(err, e4.NewInfo("%s", fromGBK(out)))
 
 	time.Sleep(time.Second * 3)
 

@@ -20,7 +20,7 @@ func (n *Network) SetupInterface() {
 			MultiQueue: true,
 		},
 	})
-	ce(err, e4.WithInfo("new interface"))
+	ce(err, e4.NewInfo("new interface"))
 
 	link, err := netlink.LinkByName(iface.Name())
 	ce(err)
