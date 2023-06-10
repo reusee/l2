@@ -114,7 +114,7 @@ func (n *Network) startUDP(
 				},
 			}
 			remotes = append(remotes, remote)
-			trigger(scope.Sub(
+			trigger(scope.Fork(
 				&remote,
 			), EvUDP, EvUDPRemoteAdded)
 		}
@@ -145,7 +145,7 @@ func (n *Network) startUDP(
 			StartedAt: now,
 		}
 		locals = append(locals, local)
-		trigger(scope.Sub(
+		trigger(scope.Fork(
 			&local,
 		), EvUDP, EvUDPLocalAdded)
 
@@ -154,7 +154,7 @@ func (n *Network) startUDP(
 			for {
 				n, remoteAddr, err := conn.ReadFromUDP(bs)
 				if err != nil {
-					trigger(scope.Sub(
+					trigger(scope.Fork(
 						&local, &err,
 					), EvUDP, EvUDPConnReadError)
 					return
@@ -165,7 +165,7 @@ func (n *Network) startUDP(
 					if err := binary.Read(r, binary.LittleEndian, &length); is(err, io.EOF) {
 						break
 					} else if err != nil {
-						trigger(scope.Sub(
+						trigger(scope.Fork(
 							&local, &err,
 						), EvUDP, EvUDPReadInboundError)
 						return
@@ -180,7 +180,7 @@ func (n *Network) startUDP(
 						},
 					)
 					if err != nil {
-						trigger(scope.Sub(
+						trigger(scope.Fork(
 							&local, &err,
 						), EvUDP, EvUDPReadInboundError)
 						return
@@ -271,7 +271,7 @@ func (n *Network) startUDP(
 			}
 
 			if r == nil {
-				trigger(scope.Sub(
+				trigger(scope.Fork(
 					&remotes,
 				), EvUDP, EvUDPNotSent)
 				return
@@ -283,7 +283,7 @@ func (n *Network) startUDP(
 				local.Conn.SetWriteDeadline(time.Now().Add(time.Second * 2))
 				_, err := local.Conn.WriteToUDP(data, r.UDPAddr)
 				if err != nil {
-					trigger(scope.Sub(
+					trigger(scope.Fork(
 						&local, &r,
 					), EvUDP, EvUDPWriteError)
 					continue
@@ -292,7 +292,7 @@ func (n *Network) startUDP(
 				break
 			}
 			if !sent {
-				trigger(scope.Sub(
+				trigger(scope.Fork(
 					&r, &remotes,
 				), EvUDP, EvUDPNotSent)
 			}
@@ -314,7 +314,7 @@ func (n *Network) startUDP(
 				if now.Sub(local.StartedAt) > localConnDuration {
 					local.Conn.Close()
 					locals = append(locals[:i], locals[i+1:]...)
-					trigger(scope.Sub(
+					trigger(scope.Fork(
 						&local,
 					), EvUDP, EvUDPLocalClosed)
 					continue
@@ -328,7 +328,7 @@ func (n *Network) startUDP(
 				remote := remotes[i]
 				if now.Sub(remote.AddedAt) > remoteDuration {
 					remotes = append(remotes[:i], remotes[i+1:]...)
-					trigger(scope.Sub(
+					trigger(scope.Fork(
 						&remote,
 					), EvUDP, EvUDPRemoteClosed)
 					continue
@@ -354,7 +354,7 @@ func (n *Network) startUDP(
 					AddedAt:    now,
 				}
 				remotes = append(remotes, remote)
-				trigger(scope.Sub(
+				trigger(scope.Fork(
 					&remote,
 				), EvUDP, EvUDPRemoteAdded)
 			}
@@ -380,7 +380,7 @@ func (n *Network) startUDP(
 								}
 							}
 							remote.Addrs = append(remote.Addrs, addr)
-							trigger(scope.Sub(
+							trigger(scope.Fork(
 								&remote, &addr,
 							), EvUDP, EvUDPRemoteGotAddr)
 						}
@@ -395,7 +395,7 @@ func (n *Network) startUDP(
 								}
 							}
 							remote.IPs = append(remote.IPs, ip)
-							trigger(scope.Sub(
+							trigger(scope.Fork(
 								&remote, &ip,
 							), EvUDP, EvUDPRemoteGotIP)
 						}
@@ -410,7 +410,7 @@ func (n *Network) startUDP(
 								}
 							}
 							remote.IPs = append(remote.IPs, ip)
-							trigger(scope.Sub(
+							trigger(scope.Fork(
 								&remote, &ip,
 							), EvUDP, EvUDPRemoteGotIP)
 						}
@@ -422,7 +422,7 @@ func (n *Network) startUDP(
 			inbound.Inbound.BridgeIndex = uint8(bridgeIndex)
 			select {
 			case inboundCh <- inbound.Inbound:
-				trigger(scope.Sub(
+				trigger(scope.Fork(
 					&inbound, &inbound.Inbound,
 				), EvUDP, EvUDPInboundSent)
 			case <-closing:

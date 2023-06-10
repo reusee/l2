@@ -79,7 +79,7 @@ func (n *Network) startTCP(
 			return true
 		})
 		for _, c := range deleted {
-			trigger(scope.Sub(
+			trigger(scope.Fork(
 				&c,
 			), EvTCP, EvTCPConnDeleted)
 		}
@@ -92,7 +92,7 @@ func (n *Network) startTCP(
 		var err error
 		defer func() {
 			if err != nil {
-				trigger(scope.Sub(
+				trigger(scope.Fork(
 					&conn, &err,
 				), EvTCP, EvTCPReadInboundError)
 			}
@@ -157,7 +157,7 @@ func (n *Network) startTCP(
 							conn.Lock()
 							conn.Addrs = append(conn.Addrs, addr)
 							conn.Unlock()
-							trigger(scope.Sub(
+							trigger(scope.Fork(
 								&conn, &addr,
 							), EvTCP, EvTCPConnGotAddr)
 						}
@@ -174,7 +174,7 @@ func (n *Network) startTCP(
 							conn.Lock()
 							conn.IPs = append(conn.IPs, ip)
 							conn.Unlock()
-							trigger(scope.Sub(
+							trigger(scope.Fork(
 								&conn, &ip,
 							), EvTCP, EvTCPConnGotIP)
 						}
@@ -191,7 +191,7 @@ func (n *Network) startTCP(
 							conn.Lock()
 							conn.IPs = append(conn.IPs, ip)
 							conn.Unlock()
-							trigger(scope.Sub(
+							trigger(scope.Fork(
 								&conn, &ip,
 							), EvTCP, EvTCPConnGotIP)
 						}
@@ -205,7 +205,7 @@ func (n *Network) startTCP(
 			inbound.BridgeIndex = uint8(bridgeIndex)
 			select {
 			case inboundCh <- inbound:
-				trigger(scope.Sub(
+				trigger(scope.Fork(
 					&conn, &inbound,
 				), EvTCP, EvTCPInboundSent)
 			case <-closing:
@@ -241,12 +241,12 @@ func (n *Network) startTCP(
 				}
 
 				// listen
-				trigger(scope.Sub(
+				trigger(scope.Fork(
 					&hostPort,
 				), EvTCP, EvTCPListening)
 				ln, err := listenConfig.Listen(context.Background(), "tcp", hostPort)
 				if err != nil {
-					trigger(scope.Sub(
+					trigger(scope.Fork(
 						&hostPort, &err,
 					), EvTCP, EvTCPListenFailed)
 					continue
@@ -255,7 +255,7 @@ func (n *Network) startTCP(
 					Listener:  ln,
 					StartedAt: getTime(),
 				}
-				trigger(scope.Sub(
+				trigger(scope.Fork(
 					&listener,
 				), EvTCP, EvTCPListened)
 
@@ -265,7 +265,7 @@ func (n *Network) startTCP(
 						if err != nil {
 							return
 						}
-						trigger(scope.Sub(
+						trigger(scope.Fork(
 							&listener, &netConn,
 						), EvTCP, EvTCPAccepted)
 
@@ -278,7 +278,7 @@ func (n *Network) startTCP(
 								T0:      time.Now(),
 							}
 							conns.Store(netConn.RemoteAddr().String(), conn)
-							trigger(scope.Sub(
+							trigger(scope.Fork(
 								&conn,
 							), EvTCP, EvTCPConnAdded)
 							readConn(conn)
@@ -312,18 +312,18 @@ func (n *Network) startTCP(
 
 					// connect
 					spawn(scope, func() {
-						trigger(scope.Sub(
+						trigger(scope.Fork(
 							&hostPort, &node,
 						), EvTCP, EvTCPDialing)
 						netConn, err := dialer.Dial("tcp", hostPort)
 						if err != nil {
 							conns.Delete(hostPort)
-							trigger(scope.Sub(
+							trigger(scope.Fork(
 								&hostPort, &node,
 							), EvTCP, EvTCPDialFailed)
 							return
 						}
-						trigger(scope.Sub(
+						trigger(scope.Fork(
 							&hostPort, &node, &netConn,
 						), EvTCP, EvTCPDialed)
 						if err := netConn.SetDeadline(getTime().Add(connDuration)); err != nil {
@@ -337,11 +337,11 @@ func (n *Network) startTCP(
 							},
 							T0: time.Now(),
 						}
-						trigger(scope.Sub(
+						trigger(scope.Fork(
 							&conn, &node.LanIP,
 						), EvTCP, EvTCPConnGotIP)
 						conns.Store(hostPort, conn)
-						trigger(scope.Sub(
+						trigger(scope.Fork(
 							&conn,
 						), EvTCP, EvTCPConnAdded)
 						readConn(conn)
@@ -447,7 +447,7 @@ func (n *Network) startTCP(
 					conn.closeOnce.Do(func() {
 						conn.Close()
 					})
-					trigger(scope.Sub(
+					trigger(scope.Fork(
 						&conn, &err,
 					), EvTCP, EvTCPWriteError)
 					deleteConn(conn)
@@ -458,7 +458,7 @@ func (n *Network) startTCP(
 			}
 
 			if !sent {
-				trigger(scope.Sub(
+				trigger(scope.Fork(
 					&conns, &ip, &addr,
 				), EvTCP, EvTCPNotSent)
 			}
@@ -489,7 +489,7 @@ func (n *Network) startTCP(
 				if now.Sub(listener.StartedAt) > listenerDuration {
 					listener.Listener.Close()
 					delete(listeners, addr)
-					trigger(scope.Sub(
+					trigger(scope.Fork(
 						&listener,
 					), EvTCP, EvTCPListenerClosed)
 				}
@@ -502,7 +502,7 @@ func (n *Network) startTCP(
 		case <-closing:
 			for _, ln := range listeners {
 				ln.Listener.Close()
-				trigger(scope.Sub(
+				trigger(scope.Fork(
 					&ln,
 				), EvTCP, EvTCPListenerClosed)
 			}
@@ -520,7 +520,7 @@ func (n *Network) startTCP(
 		}
 
 		if d := time.Since(t0); d > time.Second*5 {
-			trigger(scope.Sub(
+			trigger(scope.Fork(
 				&d, &op,
 			), EvTCP, EvTCPSlow)
 		}

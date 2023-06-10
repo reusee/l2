@@ -123,7 +123,7 @@ func (n *Network) startICMP(
 				if err := binary.Read(r, binary.LittleEndian, &length); is(err, io.EOF) {
 					break
 				} else if err != nil {
-					trigger(scope.Sub(
+					trigger(scope.Fork(
 						&localConn, &err,
 					), EvUDP, EvICMPReadInboundError)
 					break
@@ -138,7 +138,7 @@ func (n *Network) startICMP(
 					},
 				)
 				if err != nil {
-					trigger(scope.Sub(
+					trigger(scope.Fork(
 						&localConn, &err,
 					), EvUDP, EvICMPReadInboundError)
 					break
@@ -208,7 +208,7 @@ func (n *Network) startICMP(
 			}
 
 			if r == nil {
-				trigger(scope.Sub(
+				trigger(scope.Fork(
 					&remotes,
 				), EvICMP, EvICMPNotSent)
 				return
@@ -230,14 +230,14 @@ func (n *Network) startICMP(
 			if _, err := localConn.WriteTo(payload, &net.IPAddr{
 				IP: r.IP,
 			}); err != nil {
-				trigger(scope.Sub(
+				trigger(scope.Fork(
 					&r,
 				), EvICMP, EvICMPWriteError)
 				return
 			}
 
 			if !sent {
-				trigger(scope.Sub(
+				trigger(scope.Fork(
 					&r, &remotes,
 				), EvICMP, EvICMPNotSent)
 			}
@@ -297,7 +297,7 @@ func (n *Network) startICMP(
 			inbound.Inbound.BridgeIndex = uint8(bridgeIndex)
 			select {
 			case inboundCh <- inbound.Inbound:
-				trigger(scope.Sub(
+				trigger(scope.Fork(
 					&remote, &inbound,
 				), EvICMP, EvICMPInboundSent)
 			case <-closing:

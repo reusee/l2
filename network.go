@@ -261,7 +261,7 @@ func (n *Network) Start(fns ...any) (err error) {
 		outboundChans = append(outboundChans, outboundCh)
 		ready := Ready(make(chan struct{}))
 		bridgeIndex := BridgeIndex(i)
-		spawn(scope.Sub(
+		spawn(scope.Fork(
 			&outboundCh,
 			&inboundChan,
 			&ready,
@@ -319,7 +319,7 @@ func (n *Network) Start(fns ...any) (err error) {
 		parser.AddDecodingLayer(&udp)
 		decoded := make([]gopacket.LayerType, 0, 10)
 		serial := rand.Uint64()
-		frameScope := scope.Sub(
+		frameScope := scope.Fork(
 			func() (
 				*layers.Ethernet,
 				*layers.ARP,
@@ -456,7 +456,7 @@ func (n *Network) Start(fns ...any) (err error) {
 				}
 			}
 
-			trigger(scope.Sub(
+			trigger(scope.Fork(
 				&outbound,
 			), EvNetwork, EvNetworkOutboundSent)
 
@@ -511,7 +511,7 @@ func (n *Network) Start(fns ...any) (err error) {
 					break
 				}
 
-				trigger(scope.Sub(
+				trigger(scope.Fork(
 					&inbound,
 				), EvNetwork, EvNetworkInboundReceived)
 
@@ -536,7 +536,7 @@ func (n *Network) Start(fns ...any) (err error) {
 								dedup[macInt] = m
 							}
 							if m[inbound.Serial%(1<<17)] == inbound.Serial {
-								trigger(scope.Sub(
+								trigger(scope.Fork(
 									&inbound,
 								), EvNetwork, EvNetworkInboundDuplicated)
 								continue loop_inbound
@@ -559,7 +559,7 @@ func (n *Network) Start(fns ...any) (err error) {
 					if err != nil {
 						return
 					}
-					trigger(scope.Sub(
+					trigger(scope.Fork(
 						&inbound,
 					), EvNetwork, EvNetworkInboundWritten)
 					key := ActiveKey{
