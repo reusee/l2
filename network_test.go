@@ -53,7 +53,6 @@ func testPingPong(
 		ce(err)
 		network1.Scope.Call(func(
 			spawn Spawn,
-			scope Scope,
 		) {
 			network1.Scope.Call(func(
 				on On,
@@ -62,13 +61,13 @@ func testPingPong(
 					ln.Close()
 				})
 			})
-			spawn(scope, func() {
+			spawn(network1.Scope, func() {
 				for {
 					conn, err := ln.Accept()
 					if err != nil {
 						return
 					}
-					spawn(scope, func() {
+					spawn(network1.Scope, func() {
 						defer conn.Close()
 						for {
 							var s string
