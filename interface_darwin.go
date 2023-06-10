@@ -19,7 +19,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/reusee/e4"
+	"github.com/reusee/e5"
 )
 
 type macInterface struct {
@@ -38,7 +38,7 @@ func (n *Network) SetupInterface() {
 		if0Name,
 		"create",
 	).CombinedOutput()
-	ce(err, e4.NewInfo("%s", out))
+	ce.WithInfo("%s", out)(err)
 
 	if1Name := fmt.Sprintf("feth%d", rand.Intn(100)+200)
 	iface.if1Name = if1Name
@@ -47,7 +47,7 @@ func (n *Network) SetupInterface() {
 		if1Name,
 		"create",
 	).CombinedOutput()
-	ce(err, e4.NewInfo("%s", out))
+	ce.WithInfo("%s", out)(err)
 
 	time.Sleep(time.Millisecond * 200)
 
@@ -57,7 +57,7 @@ func (n *Network) SetupInterface() {
 		"peer",
 		if1Name,
 	).CombinedOutput()
-	ce(err, e4.NewInfo("%s", out))
+	ce.WithInfo("%s", out)(err)
 
 	out, err = exec.Command(
 		"ifconfig",
@@ -65,7 +65,7 @@ func (n *Network) SetupInterface() {
 		"mtu", strconv.Itoa(n.MTU),
 		"up",
 	).CombinedOutput()
-	ce(err, e4.NewInfo("%s", out))
+	ce.WithInfo("%s", out)(err)
 
 	out, err = exec.Command(
 		"ifconfig",
@@ -73,7 +73,7 @@ func (n *Network) SetupInterface() {
 		"inet",
 		n.LocalNode.LanIP.String(),
 	).CombinedOutput()
-	ce(err, e4.NewInfo("%s", out))
+	ce.WithInfo("%s", out)(err)
 
 	out, err = exec.Command(
 		"ifconfig",
@@ -81,7 +81,7 @@ func (n *Network) SetupInterface() {
 		"mtu", strconv.Itoa(n.MTU),
 		"up",
 	).CombinedOutput()
-	ce(err, e4.NewInfo("%s", out))
+	ce.WithInfo("%s", out)(err)
 
 	//TODO use consistent MAC
 	//TODO set MACs
@@ -104,14 +104,14 @@ func (m macInterface) Close() (err error) {
 		m.if0Name,
 		"destroy",
 	).CombinedOutput()
-	ce(err, e4.NewInfo("%s", out))
+	ce.WithInfo("%s", out)(err)
 
 	out, err = exec.Command(
 		"ifconfig",
 		m.if1Name,
 		"destroy",
 	).CombinedOutput()
-	ce(err, e4.NewInfo("%s", out))
+	ce.WithInfo("%s", out)(err)
 
 	return nil
 }

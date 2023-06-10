@@ -18,7 +18,6 @@ import (
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/reusee/dscope"
-	"github.com/reusee/e4"
 )
 
 type Interface interface {
@@ -34,10 +33,10 @@ type Network struct {
 	CryptoKeyInt uint64
 
 	Scope        Scope
-	SelectNode   dyn
+	SelectNode   any
 	OnFrame      func([]byte)
 	InjectFrame  chan ([]byte)
-	PreferFormat dyn
+	PreferFormat any
 
 	LocalNode *Node
 
@@ -61,7 +60,7 @@ var (
 	IPv4zero          = net.IPv4(0, 0, 0, 0)
 )
 
-func (n *Network) Start(fns ...dyn) (err error) {
+func (n *Network) Start(fns ...any) (err error) {
 	defer he(&err)
 
 	// crypto key
@@ -73,9 +72,9 @@ func (n *Network) Start(fns ...dyn) (err error) {
 	var localNode *Node
 	if n.SelectNode != nil {
 		addrs, err := net.InterfaceAddrs()
-		ce(err, e4.NewInfo("get interface addrs"))
+		ce.WithInfo("get interface addrs")(err)
 		hostname, err := os.Hostname()
-		ce(err, e4.NewInfo("get host name"))
+		ce.WithInfo("get host name")(err)
 		dscope.New(
 			func() (
 				[]net.Addr,
@@ -331,7 +330,7 @@ func (n *Network) Start(fns ...dyn) (err error) {
 				case <-closing:
 					return
 				default:
-					ce(err, e4.NewInfo("read from interface"))
+					ce.WithInfo("read from interface")(err)
 				}
 			}
 			bs := buf[:l]

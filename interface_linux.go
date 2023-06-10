@@ -1,3 +1,4 @@
+//go:build !tun
 // +build !tun
 
 package l2
@@ -6,7 +7,6 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/reusee/e4"
 	"github.com/songgao/water"
 	"github.com/vishvananda/netlink"
 )
@@ -20,7 +20,7 @@ func (n *Network) SetupInterface() {
 			MultiQueue: true,
 		},
 	})
-	ce(err, e4.NewInfo("new interface"))
+	ce.WithInfo("new interface")(err)
 
 	link, err := netlink.LinkByName(iface.Name())
 	ce(err)
