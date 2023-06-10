@@ -31,9 +31,8 @@ type TCPConn struct {
 	T0        time.Time
 }
 
-func startTCP(
+func (n *Network) startTCP(
 	ready Ready,
-	scope Scope,
 	network *Network,
 	closing Closing,
 	spawn Spawn,
@@ -45,6 +44,8 @@ func startTCP(
 	bridgeIndex BridgeIndex,
 	localAddrs []net.Addr,
 ) {
+
+	scope := n.Scope
 
 	// port
 	portShiftInterval := time.Millisecond * 5113

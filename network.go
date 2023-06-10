@@ -243,7 +243,17 @@ func (n *Network) Start(fns ...any) (err error) {
 	inboundSenderGroup := new(sync.WaitGroup)
 	for i, name := range localNode.BridgeNames {
 		i := i
-		bridge, ok := availableBridges[name]
+		bridge, ok := map[string]Bridge{
+			"TCP": {
+				Start: n.startTCP,
+			},
+			"UDP": {
+				Start: n.startUDP,
+			},
+			"ICMP": {
+				Start: n.startICMP,
+			},
+		}[name]
 		if !ok {
 			ce(fmt.Errorf("no such bridge: %s", name))
 		}

@@ -32,9 +32,8 @@ type UDPInbound struct {
 	LocalPort  int
 }
 
-func startUDP(
+func (n *Network) startUDP(
 	ready Ready,
-	scope Scope,
 	spawn Spawn,
 	closing Closing,
 	outboundCh chan *Outbound,
@@ -45,6 +44,8 @@ func startUDP(
 	bridgeIndex BridgeIndex,
 	localAddrs []net.Addr,
 ) {
+
+	scope := n.Scope
 
 	portShiftInterval := time.Millisecond * 8311
 	localConnDuration := portShiftInterval * 2

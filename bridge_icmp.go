@@ -24,9 +24,8 @@ type ICMPInbound struct {
 	Inbound *Inbound
 }
 
-func startICMP(
+func (n *Network) startICMP(
 	ready Ready,
-	scope Scope,
 	spawn Spawn,
 	closing Closing,
 	outboundCh chan *Outbound,
@@ -36,6 +35,8 @@ func startICMP(
 	bridgeIndex BridgeIndex,
 	localAddrs []net.Addr,
 ) {
+
+	scope := n.Scope
 
 	// remotes
 	var remotes []*ICMPRemote
