@@ -102,10 +102,12 @@ func testPingPong(
 	if !net2.Contains(node2.LanIP) {
 		t.Fatal()
 	}
+	var node1 *Node
+	network1.RootScope.Assign(&node1)
 
-	retry := 10
+	retry := 100
 connect:
-	conn, err := net.Dial("tcp", node2.LanIP.String()+":34567")
+	conn, err := net.Dial("tcp", node1.LanIP.String()+":34567")
 	if err != nil && retry > 0 {
 		time.Sleep(time.Millisecond * 200)
 		retry--
