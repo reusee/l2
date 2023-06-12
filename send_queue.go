@@ -8,13 +8,15 @@ import (
 )
 
 type sendQueue struct {
-	network       *Network
 	initCountDown int
 	timerDuration time.Duration
 	timer         *time.Timer
 	timerStarted  bool
 	m             map[queueKey]*queueValue
 	sendFunc      queueSendFunc
+
+	writeOutbound WriteOutbound
+	mtu           int
 }
 
 type queueKey struct {
@@ -32,18 +34,27 @@ type queueValue struct {
 
 type queueSendFunc func(*net.IP, *net.HardwareAddr, []byte)
 
-func newSendQueue(
-	network *Network,
+type NewSendQueue func(
 	sendFunc queueSendFunc,
-) *sendQueue {
-	return &sendQueue{
-		network:       network,
-		initCountDown: 2,
-		timerDuration: time.Microsecond * 2000,
-		timer:         time.NewTimer(time.Microsecond * 2000),
-		timerStarted:  true,
-		m:             make(map[queueKey]*queueValue),
-		sendFunc:      sendFunc,
+) *sendQueue
+
+func (Network) NewSendQueue(
+	writeOutbound WriteOutbound,
+	mtu MTU,
+) NewSendQueue {
+	return func(
+		sendFunc queueSendFunc,
+	) *sendQueue {
+		return &sendQueue{
+			initCountDown: 2,
+			timerDuration: time.Microsecond * 2000,
+			timer:         time.NewTimer(time.Microsecond * 2000),
+			timerStarted:  true,
+			m:             make(map[queueKey]*queueValue),
+			sendFunc:      sendFunc,
+			writeOutbound: writeOutbound,
+			mtu:           int(mtu),
+		}
 	}
 }
 
@@ -85,13 +96,13 @@ func (q *sendQueue) enqueue(
 	}
 
 	buf := new(bytes.Buffer)
-	if err := q.network.writeOutbound(buf, outbound); err != nil {
+	if err := q.writeOutbound(buf, outbound); err != nil {
 		panic(err)
 	}
 	data := buf.Bytes()
 	inQueue, ok := q.m[key]
 	if ok {
-		if inQueue.length+len(data)+2 > int(q.network.MTU) {
+		if inQueue.length+len(data)+2 > int(q.mtu) {
 			q.send(key)
 			q.m[key] = &queueValue{
 				countDown: q.initCountDown,

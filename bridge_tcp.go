@@ -39,13 +39,17 @@ type StartTCP func(
 	inboundSenderGroup *sync.WaitGroup,
 )
 
-func (n *Network) startTCP(
-	network *Network,
+func (n *Network) StartTCP(
 	closing Closing,
 	spawn Spawn,
 	getTime func() time.Time,
 	trigger Trigger,
 	localAddrs []net.Addr,
+	readInbound ReadInbound,
+	localNode *Node,
+	newSendQueue NewSendQueue,
+	key CryptoKey,
+	activeNodes ActiveNodes,
 ) StartTCP {
 
 	return func(
@@ -63,7 +67,7 @@ func (n *Network) startTCP(
 		listenerDuration := portShiftInterval * 2
 		connDuration := time.Minute * 2
 		getPort := shiftingPort(
-			fmt.Sprintf("%x-tcp-", network.CryptoKey),
+			fmt.Sprintf("%x-tcp-", key),
 			portShiftInterval,
 		)
 
@@ -133,7 +137,7 @@ func (n *Network) startTCP(
 				if err = binary.Read(conn, binary.LittleEndian, &length); err != nil {
 					break
 				}
-				inbound, err = network.readInbound(
+				inbound, err = readInbound(
 					&io.LimitedReader{
 						R: conn,
 						N: int64(length),
@@ -215,7 +219,7 @@ func (n *Network) startTCP(
 
 				inbound.BridgeIndex = uint8(bridgeIndex)
 				select {
-				case inboundCh <- inbound:
+				case inboundChan <- inbound:
 					trigger(scope.Fork(
 						&conn, &inbound,
 					), EvTCP, EvTCPInboundSent)
@@ -228,7 +232,7 @@ func (n *Network) startTCP(
 		dialer := newDialer()
 		dialer.Timeout = listenerDuration
 		refreshConns := func() {
-			for _, node := range network.nodes.Load().([]*Node) {
+			for _, node := range *activeNodes.Load() {
 				hasTCP := false
 				for _, name := range node.BridgeNames {
 					if name == "TCP" {
@@ -242,7 +246,7 @@ func (n *Network) startTCP(
 
 				node := node
 
-				if node == network.LocalNode {
+				if node == localNode {
 					port := getPort(node, getTime())
 					hostPort := net.JoinHostPort("0.0.0.0", strconv.Itoa(port))
 
@@ -270,7 +274,7 @@ func (n *Network) startTCP(
 						&listener,
 					), EvTCP, EvTCPListened)
 
-					spawn(scope, func() {
+					spawn(func() {
 						for {
 							netConn, err := ln.Accept()
 							if err != nil {
@@ -280,7 +284,7 @@ func (n *Network) startTCP(
 								&listener, &netConn,
 							), EvTCP, EvTCPAccepted)
 
-							spawn(scope, func() {
+							spawn(func() {
 								if err := netConn.SetDeadline(getTime().Add(connDuration)); err != nil {
 									return
 								}
@@ -322,7 +326,7 @@ func (n *Network) startTCP(
 						conns.Store(hostPort, nil)
 
 						// connect
-						spawn(scope, func() {
+						spawn(func() {
 							trigger(scope.Fork(
 								&hostPort, &node,
 							), EvTCP, EvTCPDialing)
@@ -374,7 +378,6 @@ func (n *Network) startTCP(
 		trigger(scope, EvTCP, EvTCPReady)
 
 		queue := newSendQueue(
-			network,
 			func(ip *net.IP, addr *net.HardwareAddr, data []byte) {
 				sent := false
 
@@ -482,7 +485,7 @@ func (n *Network) startTCP(
 
 			select {
 
-			case outbound := <-outboundCh:
+			case outbound := <-outboundChan:
 				op = "enqueue outbound"
 				if outbound == nil {
 					break

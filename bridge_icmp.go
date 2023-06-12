@@ -33,12 +33,16 @@ type StartICMP func(
 	inboundSenderGroup *sync.WaitGroup,
 )
 
-func (n *Network) startICMP(
+func (n *Network) StartICMP(
 	spawn Spawn,
 	closing Closing,
-	network *Network,
 	trigger Trigger,
-	localAddrs []net.Addr,
+	sysAddrs SystemAllAddrs,
+	localNode *Node,
+	activeNodes ActiveNodes,
+	mtu MTU,
+	readInbound ReadInbound,
+	newSendQueue NewSendQueue,
 ) StartICMP {
 
 	return func(
@@ -53,7 +57,7 @@ func (n *Network) startICMP(
 
 		// remotes
 		var remotes []*ICMPRemote
-		for _, node := range network.nodes.Load().([]*Node) {
+		for _, node := range *activeNodes.Load() {
 			hasICMP := false
 			for _, name := range node.BridgeNames {
 				if name == "ICMP" {
@@ -65,13 +69,13 @@ func (n *Network) startICMP(
 				continue
 			}
 
-			if node == network.LocalNode {
+			if node == localNode {
 				continue
 			}
 
 			ip := node.wanIP
 			if len(ip) == 0 && len(node.PrivateIP) > 0 {
-				for _, addr := range localAddrs {
+				for _, addr := range sysAddrs {
 					if ipnet, ok := addr.(*net.IPNet); ok && ipnet.Contains(node.PrivateIP) {
 						ip = node.PrivateIP
 						break
@@ -98,11 +102,11 @@ func (n *Network) startICMP(
 		// local
 		var localConn *net.IPConn
 		localConnOK := make(chan struct{})
-		spawn(scope, func() {
-			node := network.LocalNode
+		spawn(func() {
+			node := localNode
 			ip := node.wanIP
 			if len(ip) == 0 && len(node.PrivateIP) > 0 {
-				for _, addr := range localAddrs {
+				for _, addr := range sysAddrs {
 					if ipnet, ok := addr.(*net.IPNet); ok && ipnet.Contains(node.PrivateIP) {
 						ip = node.PrivateIP
 						break
@@ -118,7 +122,7 @@ func (n *Network) startICMP(
 			})
 			ce(err)
 			close(localConnOK)
-			buf := make([]byte, network.MTU*2)
+			buf := make([]byte, mtu*2)
 			for {
 				n, addr, err := localConn.ReadFrom(buf)
 				ce(err)
@@ -144,7 +148,7 @@ func (n *Network) startICMP(
 					if length == 0 {
 						break
 					}
-					inbound, err := network.readInbound(
+					inbound, err := readInbound(
 						&io.LimitedReader{
 							R: r,
 							N: int64(length),
@@ -179,14 +183,13 @@ func (n *Network) startICMP(
 
 		seq := 42
 		var msgType icmp.Type
-		if len(network.LocalNode.wanIP) > 0 {
+		if len(localNode.wanIP) > 0 {
 			msgType = netipv4.ICMPTypeEchoReply
 		} else {
 			msgType = netipv4.ICMPTypeEcho
 		}
 
 		queue := newSendQueue(
-			network,
 			func(ip *net.IP, addr *net.HardwareAddr, data []byte) {
 				sent := false
 				var r *ICMPRemote
@@ -309,7 +312,7 @@ func (n *Network) startICMP(
 
 				inbound.Inbound.BridgeIndex = uint8(bridgeIndex)
 				select {
-				case inboundCh <- inbound.Inbound:
+				case inboundChan <- inbound.Inbound:
 					trigger(scope.Fork(
 						&remote, &inbound,
 					), EvICMP, EvICMPInboundSent)
@@ -323,7 +326,7 @@ func (n *Network) startICMP(
 				trigger(scope, EvICMP, EvICMPClosed)
 				return
 
-			case outbound := <-outboundCh:
+			case outbound := <-outboundChan:
 				if outbound == nil {
 					break
 				}

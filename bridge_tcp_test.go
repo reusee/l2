@@ -3,6 +3,8 @@ package l2
 import (
 	"net"
 	"testing"
+
+	"github.com/reusee/dscope"
 )
 
 func TestPingPongAllInitNodesTCP(t *testing.T) {
@@ -21,33 +23,61 @@ func TestPingPongAllInitNodesTCP(t *testing.T) {
 		node1, node2,
 	}
 	testPingPong(t,
+
 		func() *Network {
-			return &Network{
-				Network: net.IPNet{
-					IP:   net.IPv4(192, 168, 244, 0),
-					Mask: net.CIDRMask(24, 32),
+			return NewNetwork(
+				dscope.New(),
+				[]any{
+					func() net.IPNet {
+						return net.IPNet{
+							IP:   net.IPv4(192, 168, 244, 0),
+							Mask: net.CIDRMask(24, 32),
+						}
+					},
+					func() InitNodes {
+						return nodes
+					},
+					func() MTU {
+						return testMTU
+					},
+					func() CryptoKey {
+						return testCryptoKey
+					},
+					func() SelectNode {
+						return func() *Node {
+							return node1
+						}
+					},
 				},
-				InitNodes: nodes,
-				MTU:       testMTU,
-				CryptoKey: testCryptoKey,
-				SelectNode: func() *Node {
-					return node1
-				},
-			}
+			)
 		},
+
 		func() *Network {
-			return &Network{
-				Network: net.IPNet{
-					IP:   net.IPv4(192, 168, 244, 0),
-					Mask: net.CIDRMask(24, 32),
+			return NewNetwork(
+				dscope.New(),
+				[]any{
+					func() net.IPNet {
+						return net.IPNet{
+							IP:   net.IPv4(192, 168, 244, 0),
+							Mask: net.CIDRMask(24, 32),
+						}
+					},
+					func() InitNodes {
+						return nodes
+					},
+					func() MTU {
+						return testMTU
+					},
+					func() CryptoKey {
+						return testCryptoKey
+					},
+					func() SelectNode {
+						return func() *Node {
+							return node2
+						}
+					},
 				},
-				InitNodes: nodes,
-				MTU:       testMTU,
-				CryptoKey: testCryptoKey,
-				SelectNode: func() *Node {
-					return node2
-				},
-			}
+			)
 		},
 	)
 }
@@ -62,30 +92,56 @@ func TestPingPongOneRandomNodeTCP(t *testing.T) {
 		node1,
 	}
 	testPingPong(t,
+
 		func() *Network {
-			return &Network{
-				Network: net.IPNet{
-					IP:   net.IPv4(192, 168, 244, 0),
-					Mask: net.CIDRMask(24, 32),
+			return NewNetwork(
+				dscope.New(),
+				[]any{
+					func() net.IPNet {
+						return net.IPNet{
+							IP:   net.IPv4(192, 168, 244, 0),
+							Mask: net.CIDRMask(24, 32),
+						}
+					},
+					func() InitNodes {
+						return nodes
+					},
+					func() MTU {
+						return testMTU
+					},
+					func() CryptoKey {
+						return testCryptoKey
+					},
+					func() SelectNode {
+						return func() *Node {
+							return node1
+						}
+					},
 				},
-				InitNodes: nodes,
-				MTU:       testMTU,
-				CryptoKey: testCryptoKey,
-				SelectNode: func() *Node {
-					return node1
-				},
-			}
+			)
 		},
+
 		func() *Network {
-			return &Network{
-				Network: net.IPNet{
-					IP:   net.IPv4(192, 168, 244, 0),
-					Mask: net.CIDRMask(24, 32),
+			return NewNetwork(
+				dscope.New(),
+				[]any{
+					func() net.IPNet {
+						return net.IPNet{
+							IP:   net.IPv4(192, 168, 244, 0),
+							Mask: net.CIDRMask(24, 32),
+						}
+					},
+					func() InitNodes {
+						return nodes
+					},
+					func() MTU {
+						return testMTU
+					},
+					func() CryptoKey {
+						return testCryptoKey
+					},
 				},
-				InitNodes: nodes,
-				MTU:       testMTU,
-				CryptoKey: testCryptoKey,
-			}
+			)
 		},
 	)
 }

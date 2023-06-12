@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/reusee/dscope"
 	"github.com/vishvananda/netns"
 )
 
@@ -27,33 +28,61 @@ func TestPingPongAllInitNodesUDP(t *testing.T) {
 		node1, node2,
 	}
 	testPingPong(t,
+
 		func() *Network {
-			return &Network{
-				Network: net.IPNet{
-					IP:   net.IPv4(192, 168, 244, 0),
-					Mask: net.CIDRMask(24, 32),
+			return NewNetwork(
+				dscope.New(),
+				[]any{
+					func() net.IPNet {
+						return net.IPNet{
+							IP:   net.IPv4(192, 168, 244, 0),
+							Mask: net.CIDRMask(24, 32),
+						}
+					},
+					func() InitNodes {
+						return nodes
+					},
+					func() MTU {
+						return testMTU
+					},
+					func() CryptoKey {
+						return testCryptoKey
+					},
+					func() SelectNode {
+						return func() *Node {
+							return node1
+						}
+					},
 				},
-				InitNodes: nodes,
-				MTU:       testMTU,
-				CryptoKey: testCryptoKey,
-				SelectNode: func() *Node {
-					return node1
-				},
-			}
+			)
 		},
+
 		func() *Network {
-			return &Network{
-				Network: net.IPNet{
-					IP:   net.IPv4(192, 168, 244, 0),
-					Mask: net.CIDRMask(24, 32),
+			return NewNetwork(
+				dscope.New(),
+				[]any{
+					func() net.IPNet {
+						return net.IPNet{
+							IP:   net.IPv4(192, 168, 244, 0),
+							Mask: net.CIDRMask(24, 32),
+						}
+					},
+					func() InitNodes {
+						return nodes
+					},
+					func() MTU {
+						return testMTU
+					},
+					func() CryptoKey {
+						return testCryptoKey
+					},
+					func() SelectNode {
+						return func() *Node {
+							return node2
+						}
+					},
 				},
-				InitNodes: nodes,
-				MTU:       testMTU,
-				CryptoKey: testCryptoKey,
-				SelectNode: func() *Node {
-					return node2
-				},
-			}
+			)
 		},
 	)
 }
@@ -68,30 +97,56 @@ func TestPingPongOneRandomNodeUDP(t *testing.T) {
 		node1,
 	}
 	testPingPong(t,
+
 		func() *Network {
-			return &Network{
-				Network: net.IPNet{
-					IP:   net.IPv4(192, 168, 244, 0),
-					Mask: net.CIDRMask(24, 32),
+			return NewNetwork(
+				dscope.New(),
+				[]any{
+					func() net.IPNet {
+						return net.IPNet{
+							IP:   net.IPv4(192, 168, 244, 0),
+							Mask: net.CIDRMask(24, 32),
+						}
+					},
+					func() InitNodes {
+						return nodes
+					},
+					func() MTU {
+						return testMTU
+					},
+					func() CryptoKey {
+						return testCryptoKey
+					},
+					func() SelectNode {
+						return func() *Node {
+							return node1
+						}
+					},
 				},
-				InitNodes: nodes,
-				MTU:       testMTU,
-				CryptoKey: testCryptoKey,
-				SelectNode: func() *Node {
-					return node1
-				},
-			}
+			)
 		},
+
 		func() *Network {
-			return &Network{
-				Network: net.IPNet{
-					IP:   net.IPv4(192, 168, 244, 0),
-					Mask: net.CIDRMask(24, 32),
+			return NewNetwork(
+				dscope.New(),
+				[]any{
+					func() net.IPNet {
+						return net.IPNet{
+							IP:   net.IPv4(192, 168, 244, 0),
+							Mask: net.CIDRMask(24, 32),
+						}
+					},
+					func() InitNodes {
+						return nodes
+					},
+					func() MTU {
+						return testMTU
+					},
+					func() CryptoKey {
+						return testCryptoKey
+					},
 				},
-				InitNodes: nodes,
-				MTU:       testMTU,
-				CryptoKey: testCryptoKey,
-			}
+			)
 		},
 	)
 }
@@ -111,58 +166,87 @@ func BenchmarkUDP(b *testing.B) {
 	nodes := []*Node{
 		node1, node2,
 	}
-	network1 := &Network{
-		Network: net.IPNet{
-			IP:   net.IPv4(192, 168, 244, 0),
-			Mask: net.CIDRMask(24, 32),
+
+	network1 := NewNetwork(
+		dscope.New(),
+		[]any{
+			func() net.IPNet {
+				return net.IPNet{
+					IP:   net.IPv4(192, 168, 244, 0),
+					Mask: net.CIDRMask(24, 32),
+				}
+			},
+			func() InitNodes {
+				return nodes
+			},
+			func() MTU {
+				return testMTU
+			},
+			func() CryptoKey {
+				return testCryptoKey
+			},
+			func() SelectNode {
+				return func() *Node {
+					return node1
+				}
+			},
 		},
-		InitNodes: nodes,
-		MTU:       testMTU,
-		CryptoKey: testCryptoKey,
-		SelectNode: func() *Node {
-			return node1
+	)
+
+	network2 := NewNetwork(
+		dscope.New(),
+		[]any{
+			func() net.IPNet {
+				return net.IPNet{
+					IP:   net.IPv4(192, 168, 244, 0),
+					Mask: net.CIDRMask(24, 32),
+				}
+			},
+			func() InitNodes {
+				return nodes
+			},
+			func() MTU {
+				return testMTU
+			},
+			func() CryptoKey {
+				return testCryptoKey
+			},
+			func() SelectNode {
+				return func() *Node {
+					return node2
+				}
+			},
 		},
-	}
-	network2 := &Network{
-		Network: net.IPNet{
-			IP:   net.IPv4(192, 168, 244, 0),
-			Mask: net.CIDRMask(24, 32),
-		},
-		InitNodes: nodes,
-		MTU:       testMTU,
-		CryptoKey: testCryptoKey,
-		SelectNode: func() *Node {
-			return node2
-		},
-	}
+	)
 
 	ok := make(chan struct{})
 	go func() {
 		runtime.LockOSThread()
 		_, err := netns.New()
 		ce(err)
-		ce(network1.Start())
+		var start1 Start
+		network1.RootScope.Assign(&start1)
+		ce(start1())
 
-		ln, err := net.Listen("tcp", network1.LocalNode.LanIP.String()+":34567")
+		ln, err := net.Listen("tcp", node1.LanIP.String()+":34567")
 		ce(err)
-		network1.Scope.Call(func(
+		network1.RootScope.Call(func(
 			spawn Spawn,
-			scope Scope,
 		) {
-			network1.Scope.Call(func(
+			network1.RootScope.Call(func(
 				on On,
 			) {
 				on(EvNetworkClosing, func() {
 					ln.Close()
 				})
 			})
-			spawn(scope, func() {
+			spawn(func() {
 				for {
 					conn, err := ln.Accept()
 					if err != nil {
 						return
 					}
-					spawn(scope, func() {
+					spawn(func() {
 						defer conn.Close()
 						for {
 							var s string
@@ -181,11 +265,13 @@ func BenchmarkUDP(b *testing.B) {
 	}()
 	<-ok
 
-	ce(network2.Start())
+	var start2 Start
+	network2.RootScope.Assign(&start2)
+	ce(start2())
 
 	retry := 10
 connect:
-	conn, err := net.Dial("tcp", network1.LocalNode.LanIP.String()+":34567")
+	conn, err := net.Dial("tcp", node2.LanIP.String()+":34567")
 	if err != nil && retry > 0 {
 		time.Sleep(time.Millisecond * 200)
 		retry--

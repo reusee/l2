@@ -41,14 +41,18 @@ type StartUDP func(
 	inboundSenderGroup *sync.WaitGroup,
 )
 
-func (n *Network) startUDP(
+func (n *Network) StartUDP(
 	spawn Spawn,
 	closing Closing,
-	network *Network,
 	getTime func() time.Time,
-	inboundCh chan *Inbound,
 	trigger Trigger,
 	localAddrs []net.Addr,
+	localNode *Node,
+	mtu MTU,
+	readInbound ReadInbound,
+	key CryptoKey,
+	activeNodes ActiveNodes,
+	newSendQueue NewSendQueue,
 ) StartUDP {
 
 	return func(
@@ -66,7 +70,7 @@ func (n *Network) startUDP(
 		remoteDuration := time.Minute * 2
 
 		getPort := shiftingPort(
-			fmt.Sprintf("%x-udp-", network.CryptoKey),
+			fmt.Sprintf("%x-udp-", key),
 			portShiftInterval,
 		)
 
@@ -75,7 +79,7 @@ func (n *Network) startUDP(
 
 		updateRemotes := func() {
 		loop_nodes:
-			for _, node := range network.nodes.Load().([]*Node) {
+			for _, node := range *activeNodes.Load() {
 				hasUDP := false
 				for _, name := range node.BridgeNames {
 					if name == "UDP" {
@@ -87,7 +91,7 @@ func (n *Network) startUDP(
 					continue
 				}
 
-				if node == network.LocalNode {
+				if node == localNode {
 					// non remote
 					continue
 				}
@@ -163,8 +167,8 @@ func (n *Network) startUDP(
 				&local,
 			), EvUDP, EvUDPLocalAdded)
 
-			spawn(scope, func() {
-				bs := make([]byte, network.MTU*2)
+			spawn(func() {
+				bs := make([]byte, int(mtu)*2)
 				for {
 					n, remoteAddr, err := conn.ReadFromUDP(bs)
 					if err != nil {
@@ -187,7 +191,7 @@ func (n *Network) startUDP(
 						if length == 0 {
 							break
 						}
-						inbound, err := network.readInbound(
+						inbound, err := readInbound(
 							&io.LimitedReader{
 								R: r,
 								N: int64(length),
@@ -211,7 +215,7 @@ func (n *Network) startUDP(
 
 		}
 
-		port := getPort(network.LocalNode, getTime())
+		port := getPort(localNode, getTime())
 		addLocal(port)
 
 		close(ready)
@@ -230,7 +234,6 @@ func (n *Network) startUDP(
 		decoded := make([]gopacket.LayerType, 0, 10)
 
 		queue := newSendQueue(
-			network,
 			func(ip *net.IP, addr *net.HardwareAddr, data []byte) {
 				sent := false
 
@@ -320,7 +323,7 @@ func (n *Network) startUDP(
 			case <-refreshConnsTicker.C:
 				now := getTime()
 				// add local conn
-				port := getPort(network.LocalNode, getTime())
+				port := getPort(localNode, getTime())
 				addLocal(port)
 				// delete local conn
 				for i := 0; i < len(locals); {
@@ -435,14 +438,14 @@ func (n *Network) startUDP(
 
 				inbound.Inbound.BridgeIndex = uint8(bridgeIndex)
 				select {
-				case inboundCh <- inbound.Inbound:
+				case inboundChan <- inbound.Inbound:
 					trigger(scope.Fork(
 						&inbound, &inbound.Inbound,
 					), EvUDP, EvUDPInboundSent)
 				case <-closing:
 				}
 
-			case outbound := <-outboundCh:
+			case outbound := <-outboundChan:
 				if outbound == nil {
 					break
 				}

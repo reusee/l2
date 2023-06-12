@@ -14,7 +14,7 @@ import (
 
 var (
 	testCryptoKey = []byte("12345678901234567890123456789012")
-	testMTU       = 300
+	testMTU       = MTU(300)
 )
 
 func testPingPong(
@@ -43,31 +43,36 @@ func testPingPong(
 		_ = ns1
 
 		network1 = getNetwork1()
-		err = network1.Start()
-		ce(err)
-		if !network1.Network.Contains(network1.LocalNode.LanIP) {
+		var start1 Start
+		network1.RootScope.Assign(&start1)
+		ce(start1())
+		var net1 net.IPNet
+		network1.RootScope.Assign(&net1)
+		var node1 *Node
+		network1.RootScope.Assign(&node1)
+		if !net1.Contains(node1.LanIP) {
 			panic("fail")
 		}
 
-		ln, err := net.Listen("tcp", network1.LocalNode.LanIP.String()+":34567")
+		ln, err := net.Listen("tcp", node1.LanIP.String()+":34567")
 		ce(err)
-		network1.Scope.Call(func(
+		network1.RootScope.Call(func(
 			spawn Spawn,
 		) {
-			network1.Scope.Call(func(
+			network1.RootScope.Call(func(
 				on On,
 			) {
 				on(EvNetworkClosing, func() {
 					ln.Close()
 				})
 			})
-			spawn(network1.Scope, func() {
+			spawn(func() {
 				for {
 					conn, err := ln.Accept()
 					if err != nil {
 						return
 					}
-					spawn(network1.Scope, func() {
+					spawn(func() {
 						defer conn.Close()
 						for {
 							var s string
@@ -87,15 +92,20 @@ func testPingPong(
 	<-ok1
 
 	network2 := getNetwork2()
-	err := network2.Start()
-	ce(err)
-	if !network2.Network.Contains(network2.LocalNode.LanIP) {
+	var start2 Start
+	network2.RootScope.Assign(&start2)
+	ce(start2())
+	var net2 net.IPNet
+	network2.RootScope.Assign(&net2)
+	var node2 *Node
+	network2.RootScope.Assign(&node2)
+	if !net2.Contains(node2.LanIP) {
 		t.Fatal()
 	}
 
 	retry := 10
 connect:
-	conn, err := net.Dial("tcp", network1.LocalNode.LanIP.String()+":34567")
+	conn, err := net.Dial("tcp", node2.LanIP.String()+":34567")
 	if err != nil && retry > 0 {
 		time.Sleep(time.Millisecond * 200)
 		retry--

@@ -24,10 +24,6 @@ type Interface interface {
 
 type Network struct {
 	RootScope Scope
-
-	InjectFrame chan ([]byte)
-
-	nodes atomic.Value
 }
 
 var (
@@ -47,7 +43,7 @@ func NewNetwork(parent Scope, defSets ...[]any) *Network {
 
 type Start func() (err error)
 
-func (Network) Start(
+func (n *Network) Start(
 	localNode *Node,
 	startTCP StartTCP,
 	startUDP StartUDP,
@@ -63,7 +59,10 @@ func (Network) Start(
 	cryptoKey CryptoKey,
 	cryptoKeyInt CryptoKeyInt,
 	trigger Trigger,
+	hwAddr HardwareAddr,
 ) Start {
+
+	scope := n.RootScope
 
 	return func() (err error) {
 		defer he(&err)
@@ -308,7 +307,7 @@ func (Network) Start(
 		})
 
 		// interface <- bridge
-		n.InjectFrame = make(chan []byte, 1024)
+		injectFrame := make(chan []byte, 1024)
 
 		spawn(func() {
 
@@ -372,12 +371,12 @@ func (Network) Start(
 
 					if inbound.DestAddr != nil &&
 						!bytes.Equal(*inbound.DestAddr, EthernetBroadcast) &&
-						len(ifaceHardwareAddr) > 0 &&
-						!bytes.Equal(*inbound.DestAddr, ifaceHardwareAddr) {
+						len(hwAddr) > 0 &&
+						!bytes.Equal(*inbound.DestAddr, hwAddr) {
 						break
 					}
 					doChan <- func() {
-						_, err := n.iface.Write(inbound.Eth)
+						_, err := iface.Write(inbound.Eth)
 						if err != nil {
 							return
 						}
@@ -393,8 +392,8 @@ func (Network) Start(
 						lastActiveL.Unlock()
 					}
 
-				case bs := <-n.InjectFrame:
-					_, _ = n.iface.Write(bs)
+				case bs := <-injectFrame:
+					_, _ = iface.Write(bs)
 
 				case <-closing:
 					return
