@@ -10,11 +10,12 @@ type CloseWaitGroup struct {
 	*sync.WaitGroup
 }
 
-func (n Network) Close() (
+func (n Network) Close(
+	trigger Trigger,
+) (
 	closing Closing,
 	wg CloseWaitGroup,
 	_close Close,
-	trigger Trigger,
 ) {
 
 	closing = make(Closing)

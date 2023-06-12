@@ -44,9 +44,9 @@ type StartUDP func(
 func (n *Network) StartUDP(
 	spawn Spawn,
 	closing Closing,
-	getTime func() time.Time,
+	getTime GetTime,
 	trigger Trigger,
-	localAddrs []net.Addr,
+	sysAddrs SystemAllAddrs,
 	localNode *Node,
 	mtu MTU,
 	readInbound ReadInbound,
@@ -98,7 +98,7 @@ func (n *Network) StartUDP(
 
 				ip := node.wanIP
 				if len(ip) == 0 && len(node.PrivateIP) > 0 {
-					for _, addr := range localAddrs {
+					for _, addr := range sysAddrs {
 						if ipnet, ok := addr.(*net.IPNet); ok && ipnet.Contains(node.PrivateIP) {
 							ip = node.PrivateIP
 							break

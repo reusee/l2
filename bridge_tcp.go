@@ -42,9 +42,9 @@ type StartTCP func(
 func (n *Network) StartTCP(
 	closing Closing,
 	spawn Spawn,
-	getTime func() time.Time,
+	getTime GetTime,
 	trigger Trigger,
-	localAddrs []net.Addr,
+	sysAddrs SystemAllAddrs,
 	readInbound ReadInbound,
 	localNode *Node,
 	newSendQueue NewSendQueue,
@@ -309,7 +309,7 @@ func (n *Network) StartTCP(
 
 					ip := node.wanIP
 					if len(ip) == 0 && len(node.PrivateIP) > 0 {
-						for _, addr := range localAddrs {
+						for _, addr := range sysAddrs {
 							if ipnet, ok := addr.(*net.IPNet); ok && ipnet.Contains(node.PrivateIP) {
 								ip = node.PrivateIP
 								break

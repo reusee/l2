@@ -129,11 +129,15 @@ connect:
 	wg.Add(2)
 	go func() {
 		defer wg.Done()
-		network1.Close()
+		var close1 Close
+		network1.RootScope.Assign(&close1)
+		close1()
 	}()
 	go func() {
 		defer wg.Done()
-		network2.Close()
+		var close2 Close
+		network1.RootScope.Assign(&close2)
+		close2()
 	}()
 	wg.Wait()
 
