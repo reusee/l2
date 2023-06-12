@@ -62,7 +62,7 @@ type (
 	Trigger func(scope Scope, evs ...any)
 )
 
-func Ev() (
+func (Network) Events() (
 	on On,
 	onNext OnNext,
 	trigger Trigger,

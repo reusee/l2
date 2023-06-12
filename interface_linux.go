@@ -11,12 +11,17 @@ import (
 	"github.com/vishvananda/netlink"
 )
 
-func (n *Network) SetupInterface() {
+func (Network) Interface(
+	localNode *Node,
+	ipnet net.IPNet,
+	mtu MTU,
+) Interface {
+
 	interfaceType := water.DeviceType(water.TAP)
 	iface, err := water.New(water.Config{
 		DeviceType: interfaceType,
 		PlatformSpecificParams: water.PlatformSpecificParams{
-			Name:       fmt.Sprintf("L2-%s-%d", n.LocalNode.LanIP.String(), n.LocalNode.ID),
+			Name:       fmt.Sprintf("L2-%s-%d", localNode.LanIP.String(), localNode.ID),
 			MultiQueue: true,
 		},
 	})
@@ -24,21 +29,21 @@ func (n *Network) SetupInterface() {
 
 	link, err := netlink.LinkByName(iface.Name())
 	ce(err)
-	hwAddr := ip2Mac(n.LocalNode.LanIP)
+	hwAddr := ip2Mac(localNode.LanIP)
 	ce(netlink.LinkSetHardwareAddr(link, hwAddr))
 	err = netlink.LinkSetUp(link)
 	ce(err)
 	err = netlink.AddrAdd(link, &netlink.Addr{
 		IPNet: &net.IPNet{
-			IP:   n.LocalNode.LanIP,
-			Mask: n.Network.Mask,
+			IP:   localNode.LanIP,
+			Mask: ipnet.Mask,
 		},
 	})
 	ce(err)
-	err = netlink.LinkSetMTU(link, n.MTU)
+	err = netlink.LinkSetMTU(link, int(mtu))
 	ce(err)
 	err = netlink.SetPromiscOn(link)
 	ce(err)
 
-	n.iface = iface
+	return iface
 }

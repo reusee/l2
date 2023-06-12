@@ -63,7 +63,7 @@ func (n *Network) writeOutbound(w io.Writer, outbound *Outbound) (err error) {
 	return nil
 }
 
-func (outbound *Outbound) encode(key []byte, keyInt uint64) (err error) {
+func (outbound *Outbound) encode(key CryptoKey, keyInt CryptoKeyInt) (err error) {
 	defer he(&err)
 	outbound.encodeOnce.Do(func() {
 		bs := new(bytes.Buffer)

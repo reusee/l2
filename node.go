@@ -1,6 +1,8 @@
 package l2
 
 import (
+	"encoding/binary"
+	"math/rand"
 	"net"
 )
 
@@ -34,4 +36,47 @@ func (n *Node) Init() {
 	}
 	// ip string
 	n.lanIPStr = n.LanIP.String()
+}
+
+func (Network) LocalNode(
+	selectNode SelectNode,
+	ipnet net.IPNet,
+	initNodes InitNodes,
+) *Node {
+
+	if selectNode != nil {
+		return selectNode()
+	}
+
+	// random ip
+	ones, _ := ipnet.Mask.Size()
+random_ip:
+	ip := ipnet.IP.Mask(ipnet.Mask)
+	bs := make(net.IP, len(ip))
+	if len(bs) == 8 {
+		num := uint64(rand.Int63()) & (^uint64(0) >> ones)
+		if num == 0 || (^num) == 0 {
+			goto random_ip
+		}
+		binary.BigEndian.PutUint64(bs, uint64(num))
+	} else {
+		num := uint32(rand.Int63()) & (^uint32(0) >> ones)
+		if num == 0 || (^num) == 0 {
+			goto random_ip
+		}
+		binary.BigEndian.PutUint32(bs, uint32(num))
+	}
+	for i, b := range ip {
+		ip[i] = b | bs[i]
+	}
+	for _, node := range initNodes {
+		if node.LanIP.Equal(ip) {
+			goto random_ip
+		}
+	}
+
+	return &Node{
+		LanIP: ip,
+	}
+
 }
