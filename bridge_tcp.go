@@ -234,14 +234,7 @@ func (n *Network) StartTCP(
 		dialer.Timeout = listenerDuration
 		refreshConns := func() {
 			for _, node := range allNodes {
-				hasTCP := false
-				for _, name := range node.BridgeNames {
-					if name == "TCP" {
-						hasTCP = true
-						break
-					}
-				}
-				if !hasTCP {
+				if !node.HasBridge(BridgeTCP) {
 					continue
 				}
 

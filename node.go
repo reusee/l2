@@ -20,7 +20,7 @@ type Node struct {
 func (n *Node) Init() {
 	// defaults
 	if len(n.BridgeNames) == 0 {
-		n.BridgeNames = []string{"TCP"}
+		n.BridgeNames = []string{BridgeTCP}
 	}
 	// lookup host
 	if n.WanHost != "" {
@@ -36,6 +36,15 @@ func (n *Node) Init() {
 	}
 	// ip string
 	n.lanIPStr = n.LanIP.String()
+}
+
+func (n *Node) HasBridge(name string) bool {
+	for _, bridge := range n.BridgeNames {
+		if bridge == name {
+			return true
+		}
+	}
+	return false
 }
 
 func (Network) LocalNode(

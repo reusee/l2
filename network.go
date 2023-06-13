@@ -82,11 +82,11 @@ func (n *Network) Start(
 				inboundSenderGroup *sync.WaitGroup,
 			)
 			switch name {
-			case "TCP":
+			case BridgeTCP:
 				startFunc = startTCP
-			case "UDP":
+			case BridgeUDP:
 				startFunc = startUDP
-			case "ICMP":
+			case BridgeICMP:
 				startFunc = startICMP
 			default:
 				panic(fmt.Errorf("unknown bridge name: %s", name))

@@ -60,14 +60,7 @@ func (n *Network) StartICMP(
 		var remotes []*ICMPRemote
 		for _, node := range allNodes {
 
-			hasICMP := false
-			for _, name := range node.BridgeNames {
-				if name == "ICMP" {
-					hasICMP = true
-					break
-				}
-			}
-			if !hasICMP {
+			if !node.HasBridge(BridgeICMP) {
 				continue
 			}
 

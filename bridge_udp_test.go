@@ -16,12 +16,12 @@ func TestPingPongAllInitNodesUDP(t *testing.T) {
 	node1 := &Node{
 		LanIP:       net.IPv4(192, 168, 244, 4),
 		WanHost:     "localhost",
-		BridgeNames: []string{"UDP"},
+		BridgeNames: []string{BridgeUDP},
 	}
 	node2 := &Node{
 		LanIP:       net.IPv4(192, 168, 244, 5),
 		WanHost:     "localhost",
-		BridgeNames: []string{"UDP"},
+		BridgeNames: []string{BridgeUDP},
 		ID:          2,
 	}
 	nodes := []*Node{
@@ -91,7 +91,7 @@ func TestPingPongOneRandomNodeUDP(t *testing.T) {
 	node1 := &Node{
 		LanIP:       net.IPv4(192, 168, 244, 6),
 		WanHost:     "localhost",
-		BridgeNames: []string{"UDP"},
+		BridgeNames: []string{BridgeUDP},
 	}
 	nodes := []*Node{
 		node1,
@@ -155,12 +155,12 @@ func BenchmarkUDP(b *testing.B) {
 	node1 := &Node{
 		LanIP:       net.IPv4(192, 168, 244, 1),
 		WanHost:     "localhost",
-		BridgeNames: []string{"UDP"},
+		BridgeNames: []string{BridgeUDP},
 	}
 	node2 := &Node{
 		LanIP:       net.IPv4(192, 168, 244, 2),
 		WanHost:     "localhost",
-		BridgeNames: []string{"UDP"},
+		BridgeNames: []string{BridgeUDP},
 		ID:          2,
 	}
 	nodes := []*Node{

@@ -11,12 +11,12 @@ func TestPingPongAllInitNodesTCP(t *testing.T) {
 	node1 := &Node{
 		LanIP:       net.IPv4(192, 168, 244, 1),
 		WanHost:     "localhost",
-		BridgeNames: []string{"TCP"},
+		BridgeNames: []string{BridgeTCP},
 	}
 	node2 := &Node{
 		LanIP:       net.IPv4(192, 168, 244, 2),
 		WanHost:     "localhost",
-		BridgeNames: []string{"TCP"},
+		BridgeNames: []string{BridgeTCP},
 		ID:          2,
 	}
 	nodes := []*Node{
@@ -86,7 +86,7 @@ func TestPingPongOneRandomNodeTCP(t *testing.T) {
 	node1 := &Node{
 		LanIP:       net.IPv4(192, 168, 244, 3),
 		WanHost:     "localhost",
-		BridgeNames: []string{"TCP"},
+		BridgeNames: []string{BridgeTCP},
 	}
 	nodes := []*Node{
 		node1,

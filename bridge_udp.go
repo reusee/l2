@@ -81,14 +81,7 @@ func (n *Network) StartUDP(
 		updateRemotes := func() {
 		loop_nodes:
 			for _, node := range allNodes {
-				hasUDP := false
-				for _, name := range node.BridgeNames {
-					if name == "UDP" {
-						hasUDP = true
-						break
-					}
-				}
-				if !hasUDP {
+				if !node.HasBridge(BridgeUDP) {
 					continue
 				}
 
