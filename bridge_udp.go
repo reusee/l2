@@ -68,7 +68,7 @@ func (n *Network) StartUDP(
 
 		portShiftInterval := time.Millisecond * 8311
 		localConnDuration := portShiftInterval * 2
-		remoteDuration := time.Minute * 2
+		remoteDuration := portShiftInterval * 4
 
 		getPort := shiftingPort(
 			fmt.Sprintf("%x-udp-", key),
@@ -84,12 +84,10 @@ func (n *Network) StartUDP(
 				if !node.HasBridge(BridgeUDP) {
 					continue
 				}
-
 				if node == localNode {
 					// non remote
 					continue
 				}
-
 				ip := getReachableIP(node)
 				if len(ip) == 0 {
 					continue

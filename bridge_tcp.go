@@ -66,7 +66,7 @@ func (n *Network) StartTCP(
 		// port
 		portShiftInterval := time.Millisecond * 5113
 		listenerDuration := portShiftInterval * 2
-		connDuration := time.Minute * 2
+		connDuration := portShiftInterval * 4
 		getPort := shiftingPort(
 			fmt.Sprintf("%x-tcp-", key),
 			portShiftInterval,
@@ -368,7 +368,7 @@ func (n *Network) StartTCP(
 				sent := false
 
 				var candidates []*TCPConn
-				conns.Range(func(k, v any) bool {
+				conns.Range(func(_, v any) bool {
 					if v == nil {
 						return true
 					}
@@ -506,7 +506,7 @@ func (n *Network) StartTCP(
 						&ln,
 					), EvTCP, EvTCPListenerClosed)
 				}
-				conns.Range(func(k, v any) bool {
+				conns.Range(func(_, v any) bool {
 					if v == nil {
 						return true
 					}
