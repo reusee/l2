@@ -280,10 +280,9 @@ func (n *Network) Start(
 					}
 				}
 
-				//TODO
-				//trigger(scope.Fork(
-				//	&outbound,
-				//), EvNetwork, EvNetworkOutboundSent)
+				trigger(scope.Fork(
+					&outbound,
+				), EvNetwork, EvNetworkOutboundSent)
 
 			}
 		})
