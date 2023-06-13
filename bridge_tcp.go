@@ -66,7 +66,7 @@ func (n *Network) StartTCP(
 		// port
 		portShiftInterval := time.Millisecond * 5113
 		listenerDuration := portShiftInterval * 2
-		connDuration := portShiftInterval * 4
+		connDuration := portShiftInterval * 20
 		getPort := shiftingPort(
 			fmt.Sprintf("%x-tcp-", key),
 			portShiftInterval,

@@ -68,7 +68,7 @@ func (n *Network) StartUDP(
 
 		portShiftInterval := time.Millisecond * 8311
 		localConnDuration := portShiftInterval * 2
-		remoteDuration := portShiftInterval * 4
+		remoteDuration := portShiftInterval * 20
 
 		getPort := shiftingPort(
 			fmt.Sprintf("%x-udp-", key),
