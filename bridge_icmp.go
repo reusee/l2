@@ -63,11 +63,9 @@ func (n *Network) StartICMP(
 			if !node.HasBridge(BridgeICMP) {
 				continue
 			}
-
 			if node == localNode {
 				continue
 			}
-
 			ip := getReachableIP(node)
 			if len(ip) == 0 {
 				continue
@@ -81,7 +79,6 @@ func (n *Network) StartICMP(
 				},
 			}
 			remotes = append(remotes, remote)
-
 		}
 
 		inbounds := make(chan ICMPInbound, 1024)
@@ -91,24 +88,18 @@ func (n *Network) StartICMP(
 		localConnOK := make(chan struct{})
 		spawn(func() {
 			node := localNode
-			ip := node.wanIP
-			if len(ip) == 0 && len(node.PrivateIP) > 0 {
-				for _, addr := range sysAddrs {
-					if ipnet, ok := addr.(*net.IPNet); ok && ipnet.Contains(node.PrivateIP) {
-						ip = node.PrivateIP
-						break
-					}
-				}
-			}
+			ip := getReachableIP(node)
 			if len(ip) == 0 {
 				return
 			}
+
 			var err error
 			localConn, err = net.ListenIP("ip4:icmp", &net.IPAddr{
 				IP: net.ParseIP("0.0.0.0"),
 			})
 			ce(err)
 			close(localConnOK)
+
 			buf := make([]byte, mtu*2)
 			for {
 				n, addr, err := localConn.ReadFrom(buf)
@@ -177,8 +168,10 @@ func (n *Network) StartICMP(
 		}
 
 		queue := newSendQueue(
-			func(ip *net.IP, addr *net.HardwareAddr, data []byte) {
+			func(ip *net.IP, _ *net.HardwareAddr, data []byte) {
 				sent := false
+
+				// pick a icmp remote
 				var r *ICMPRemote
 				for _, remote := range remotes {
 					skip := false
