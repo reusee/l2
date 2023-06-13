@@ -37,7 +37,7 @@ func (n *Network) StartICMP(
 	spawn Spawn,
 	closing Closing,
 	trigger Trigger,
-	sysAddrs SystemAllAddrs,
+	sysAddrs SystemInterfaceAddrs,
 	localNode *Node,
 	activeNodes ActiveNodes,
 	mtu MTU,
@@ -73,6 +73,7 @@ func (n *Network) StartICMP(
 				continue
 			}
 
+			// get reachable ip, private prefered
 			ip := node.wanIP
 			if len(ip) == 0 && len(node.PrivateIP) > 0 {
 				for _, addr := range sysAddrs {

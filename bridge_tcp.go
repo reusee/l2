@@ -44,7 +44,7 @@ func (n *Network) StartTCP(
 	spawn Spawn,
 	getTime GetTime,
 	trigger Trigger,
-	sysAddrs SystemAllAddrs,
+	sysAddrs SystemInterfaceAddrs,
 	readInbound ReadInbound,
 	localNode *Node,
 	newSendQueue NewSendQueue,
@@ -307,6 +307,7 @@ func (n *Network) StartTCP(
 				} else {
 					// non-local node
 
+					// get reachable ip, private ip preferred
 					ip := node.wanIP
 					if len(ip) == 0 && len(node.PrivateIP) > 0 {
 						for _, addr := range sysAddrs {

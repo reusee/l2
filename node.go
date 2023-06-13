@@ -92,6 +92,6 @@ func (Network) ActiveNodes(
 	nodes := make([]*Node, len(allNodes))
 	copy(nodes, allNodes)
 	ret.Pointer = new(atomic.Pointer[[]*Node])
-	ret.Pointer.Store(&nodes)
+	ret.Store(&nodes)
 	return
 }

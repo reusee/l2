@@ -46,7 +46,7 @@ func (n *Network) StartUDP(
 	closing Closing,
 	getTime GetTime,
 	trigger Trigger,
-	sysAddrs SystemAllAddrs,
+	sysAddrs SystemInterfaceAddrs,
 	localNode *Node,
 	mtu MTU,
 	readInbound ReadInbound,
@@ -60,7 +60,7 @@ func (n *Network) StartUDP(
 		inboundChan chan *Inbound,
 		outboundChan chan *Outbound,
 		ready chan struct{},
-		inboundSenderGroup *sync.WaitGroup,
+		_ *sync.WaitGroup,
 	) {
 
 		scope := n.RootScope
@@ -96,6 +96,7 @@ func (n *Network) StartUDP(
 					continue
 				}
 
+				// get reachable ip, private ip preferred
 				ip := node.wanIP
 				if len(ip) == 0 && len(node.PrivateIP) > 0 {
 					for _, addr := range sysAddrs {

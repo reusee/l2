@@ -2,17 +2,9 @@ package l2
 
 import "net"
 
-type SystemUnicastAddrs []net.Addr
+type SystemInterfaceAddrs []net.Addr
 
-func (Network) SystemUnicastAddrs() SystemUnicastAddrs {
-	addrs, err := net.InterfaceAddrs()
-	ce.WithInfo("get interface addrs")(err)
-	return addrs
-}
-
-type SystemAllAddrs []net.Addr
-
-func (Network) SystemAllAddrs() SystemAllAddrs {
+func (Network) SystemInterfaceAddrs() SystemInterfaceAddrs {
 	var ifaceAddrs []net.Addr
 	ifaces, err := net.Interfaces()
 	ce(err)
