@@ -49,7 +49,7 @@ func (n *Network) StartTCP(
 	localNode *Node,
 	newSendQueue NewSendQueue,
 	key CryptoKey,
-	activeNodes ActiveNodes,
+	allNodes AllNodes,
 ) StartTCP {
 
 	return func(
@@ -232,7 +232,7 @@ func (n *Network) StartTCP(
 		dialer := newDialer()
 		dialer.Timeout = listenerDuration
 		refreshConns := func() {
-			for _, node := range *activeNodes.Load() {
+			for _, node := range allNodes {
 				hasTCP := false
 				for _, name := range node.BridgeNames {
 					if name == "TCP" {

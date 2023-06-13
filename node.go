@@ -4,7 +4,6 @@ import (
 	"encoding/binary"
 	"math/rand"
 	"net"
-	"sync/atomic"
 )
 
 type Node struct {
@@ -80,18 +79,4 @@ random_ip:
 		LanIP: ip,
 	}
 
-}
-
-type ActiveNodes struct {
-	*atomic.Pointer[[]*Node]
-}
-
-func (Network) ActiveNodes(
-	allNodes AllNodes,
-) (ret ActiveNodes) {
-	nodes := make([]*Node, len(allNodes))
-	copy(nodes, allNodes)
-	ret.Pointer = new(atomic.Pointer[[]*Node])
-	ret.Store(&nodes)
-	return
 }

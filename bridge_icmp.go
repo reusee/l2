@@ -39,10 +39,10 @@ func (n *Network) StartICMP(
 	trigger Trigger,
 	sysAddrs SystemInterfaceAddrs,
 	localNode *Node,
-	activeNodes ActiveNodes,
 	mtu MTU,
 	readInbound ReadInbound,
 	newSendQueue NewSendQueue,
+	allNodes AllNodes,
 ) StartICMP {
 
 	return func(
@@ -57,7 +57,7 @@ func (n *Network) StartICMP(
 
 		// remotes
 		var remotes []*ICMPRemote
-		for _, node := range *activeNodes.Load() {
+		for _, node := range allNodes {
 			hasICMP := false
 			for _, name := range node.BridgeNames {
 				if name == "ICMP" {

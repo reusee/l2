@@ -51,8 +51,8 @@ func (n *Network) StartUDP(
 	mtu MTU,
 	readInbound ReadInbound,
 	key CryptoKey,
-	activeNodes ActiveNodes,
 	newSendQueue NewSendQueue,
+	allNodes AllNodes,
 ) StartUDP {
 
 	return func(
@@ -79,7 +79,7 @@ func (n *Network) StartUDP(
 
 		updateRemotes := func() {
 		loop_nodes:
-			for _, node := range *activeNodes.Load() {
+			for _, node := range allNodes {
 				hasUDP := false
 				for _, name := range node.BridgeNames {
 					if name == "UDP" {
