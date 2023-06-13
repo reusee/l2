@@ -53,6 +53,7 @@ func (n *Network) StartUDP(
 	key CryptoKey,
 	newSendQueue NewSendQueue,
 	allNodes AllNodes,
+	getReachableIP GetReachableIP,
 ) StartUDP {
 
 	return func(
@@ -96,16 +97,7 @@ func (n *Network) StartUDP(
 					continue
 				}
 
-				// get reachable ip, private ip preferred
-				ip := node.wanIP
-				if len(ip) == 0 && len(node.PrivateIP) > 0 {
-					for _, addr := range sysAddrs {
-						if ipnet, ok := addr.(*net.IPNet); ok && ipnet.Contains(node.PrivateIP) {
-							ip = node.PrivateIP
-							break
-						}
-					}
-				}
+				ip := getReachableIP(node)
 				if len(ip) == 0 {
 					continue
 				}

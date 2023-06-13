@@ -43,6 +43,7 @@ func (n *Network) StartICMP(
 	readInbound ReadInbound,
 	newSendQueue NewSendQueue,
 	allNodes AllNodes,
+	getReachableIP GetReachableIP,
 ) StartICMP {
 
 	return func(
@@ -50,7 +51,7 @@ func (n *Network) StartICMP(
 		inboundChan chan *Inbound,
 		outboundChan chan *Outbound,
 		ready chan struct{},
-		inboundSenderGroup *sync.WaitGroup,
+		_ *sync.WaitGroup,
 	) {
 
 		scope := n.RootScope
@@ -58,6 +59,7 @@ func (n *Network) StartICMP(
 		// remotes
 		var remotes []*ICMPRemote
 		for _, node := range allNodes {
+
 			hasICMP := false
 			for _, name := range node.BridgeNames {
 				if name == "ICMP" {
@@ -73,16 +75,7 @@ func (n *Network) StartICMP(
 				continue
 			}
 
-			// get reachable ip, private prefered
-			ip := node.wanIP
-			if len(ip) == 0 && len(node.PrivateIP) > 0 {
-				for _, addr := range sysAddrs {
-					if ipnet, ok := addr.(*net.IPNet); ok && ipnet.Contains(node.PrivateIP) {
-						ip = node.PrivateIP
-						break
-					}
-				}
-			}
+			ip := getReachableIP(node)
 			if len(ip) == 0 {
 				continue
 			}

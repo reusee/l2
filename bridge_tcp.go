@@ -50,6 +50,7 @@ func (n *Network) StartTCP(
 	newSendQueue NewSendQueue,
 	key CryptoKey,
 	allNodes AllNodes,
+	getReachableIP GetReachableIP,
 ) StartTCP {
 
 	return func(
@@ -307,16 +308,7 @@ func (n *Network) StartTCP(
 				} else {
 					// non-local node
 
-					// get reachable ip, private ip preferred
-					ip := node.wanIP
-					if len(ip) == 0 && len(node.PrivateIP) > 0 {
-						for _, addr := range sysAddrs {
-							if ipnet, ok := addr.(*net.IPNet); ok && ipnet.Contains(node.PrivateIP) {
-								ip = node.PrivateIP
-								break
-							}
-						}
-					}
+					ip := getReachableIP(node)
 
 					if len(ip) > 0 {
 						port := getPort(node, getTime())

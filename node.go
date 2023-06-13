@@ -20,7 +20,7 @@ type Node struct {
 func (n *Node) Init() {
 	// defaults
 	if len(n.BridgeNames) == 0 {
-		n.BridgeNames = defaultBridgeNames
+		n.BridgeNames = []string{"TCP"}
 	}
 	// lookup host
 	if n.WanHost != "" {
