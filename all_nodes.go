@@ -9,9 +9,11 @@ func (Network) AllNodes(
 	ret := make([]*Node, len(initNodes))
 	copy(ret, initNodes)
 
-	// add local node to network
+	localNode.Init()
+
 	var existed bool
 	for _, node := range ret {
+		node.Init()
 		if node.LanIP.Equal(localNode.LanIP) {
 			existed = true
 			break
@@ -19,10 +21,6 @@ func (Network) AllNodes(
 	}
 	if !existed {
 		ret = append(ret, localNode)
-	}
-
-	for _, node := range ret {
-		node.Init()
 	}
 
 	return ret
