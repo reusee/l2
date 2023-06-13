@@ -3,7 +3,7 @@ module github.com/reusee/l2
 go 1.20
 
 require (
-	github.com/beevik/ntp v1.0.0
+	github.com/beevik/ntp v1.1.1
 	github.com/golang/snappy v0.0.4
 	github.com/google/gopacket v1.1.19
 	github.com/reusee/dscope v0.0.0-20230520014455-1801b66ea1c4
@@ -14,8 +14,8 @@ require (
 	github.com/vishvananda/netns v0.0.4
 	golang.org/x/crypto v0.9.0
 	golang.org/x/net v0.10.0
-	golang.org/x/sys v0.8.0
-	golang.org/x/text v0.9.0
+	golang.org/x/sys v0.9.0
+	golang.org/x/text v0.10.0
 )
 
 require (
