@@ -54,7 +54,9 @@ func (Network) LocalNode(
 ) *Node {
 
 	if selectNode != nil {
-		return selectNode()
+		if n := selectNode(); n != nil {
+			return n
+		}
 	}
 
 	// random ip
