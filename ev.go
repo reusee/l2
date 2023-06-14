@@ -58,13 +58,11 @@ const (
 
 type (
 	On      func(ev any, fn any)
-	OnNext  func(ev any, fn any)
 	Trigger func(scope Scope, evs ...any)
 )
 
 func (Network) Events() (
 	on On,
-	onNext OnNext,
 	trigger Trigger,
 ) {
 
@@ -80,15 +78,6 @@ func (Network) Events() (
 		defer l.Unlock()
 		callbacks[ev] = append(callbacks[ev], callback{
 			fn: fn,
-		})
-	}
-
-	onNext = func(ev any, fn any) {
-		l.Lock()
-		defer l.Unlock()
-		callbacks[ev] = append(callbacks[ev], callback{
-			fn:      fn,
-			oneshot: true,
 		})
 	}
 
