@@ -1,3 +1,4 @@
+//go:build tun
 // +build tun
 
 package l2
